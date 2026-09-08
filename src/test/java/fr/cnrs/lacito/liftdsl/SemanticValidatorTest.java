@@ -11,22 +11,19 @@ class SemanticValidatorTest {
 
     @Test
     void rejectsUnknownProperties() {
-        assertThrows(ValidationError.class,
-            () -> new SemanticValidator().validate(
-                dsl.parse("set unknown = \"value\" on entry[form@tww = \"mami\"]")));
+        assertThrows(ValidationError.class, () -> new SemanticValidator()
+                .validate(dsl.parse("set unknown = \"value\" on entry[form@tww = \"mami\"]")));
     }
 
     @Test
     void rejectsMissingRequiredSenseInitializer() {
-        assertThrows(ValidationError.class,
-            () -> new SemanticValidator().validate(
-                dsl.parse("create sense(category = \"Noun\") under entry[form@tww = \"mami\"]")));
+        assertThrows(ValidationError.class, () -> new SemanticValidator()
+                .validate(dsl.parse("create sense(category = \"Noun\") under entry[form@tww = \"mami\"]")));
     }
 
     @Test
     void rejectsIllegalParentRelationship() {
-        assertThrows(ValidationError.class,
-            () -> new SemanticValidator().validate(
-                dsl.parse("create example(text@tww = \"example\") under entry[form@tww = \"mami\"]")));
+        assertThrows(ValidationError.class, () -> new SemanticValidator()
+                .validate(dsl.parse("create example(text@tww = \"example\") under entry[form@tww = \"mami\"]")));
     }
 }

@@ -76,6 +76,14 @@ set gloss = "pig"
   of entry[form = "mami"]
 ```
 
+### Create new languages
+
+The `language-create` allow to create a new language in the dictionary. It take as a subcommand the string `object` or `meta` and as value the language code name. An error is thrown if the language already exist in the dictionary. Examples:
+
+```text
+language-create object = "tpi"
+language-create meta = "fr"
+```
 
 ## 3. LIFT components
 
@@ -992,13 +1000,6 @@ senses are identical if they have the same qualified gloss; two examples are
 identical if they have the same qualified text, two variants are identical if
 they have the same type and target.
 
-For entry only, the component identity is not unique and the following should
-work, even if an entry already exists with the same qualified form:
-
-```text
-create entry(form@tww = "mami")
-```
-
 The same multitext identity property cannot be referred twice with a different
 qualifier (lang). This is intended to prevent accidental creation of duplicate. It means that the following will raise a 'DUPLICATE_PROPERTY'
 error:
@@ -1009,6 +1010,17 @@ upsert sense(
   gloss@fr = "porc"
 )
 ```
+
+#### The special case of entry
+
+For entry only, a component with the same value for the identity property 'form' may exist; the following should
+work, even if an entry already exists with the same qualified form:
+
+```text
+create entry(form@tww = "mami")
+```
+
+#### to POSITION clause
 
 The create command allows an optional "to POSITION" clause, which specifies the
 index at which to insert the component under the parent list of

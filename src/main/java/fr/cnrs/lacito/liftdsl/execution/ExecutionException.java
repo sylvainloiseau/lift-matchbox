@@ -5,15 +5,22 @@ public final class ExecutionException extends RuntimeException {
     /**
      * Creates an execution exception with an underlying cause.
      *
-     * @param message human-readable explanation
-     * @param cause underlying failure
+     * @param message
+     *            human-readable explanation
+     * @param cause
+     *            underlying failure
      */
-    public ExecutionException(String message,Throwable cause){super(message,cause);}
+    public ExecutionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
     /**
      * Creates an execution exception without an underlying cause.
      *
-     * @param message human-readable explanation
+     * @param message
+     *            human-readable explanation
      */
-    public ExecutionException(String message){super(message);}
+    public ExecutionException(String message) {
+        super(message);
+    }
 }
