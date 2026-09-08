@@ -1,0 +1,22 @@
+grammar ConciseLiftDsl;
+program: line* EOF;
+line: command path (component initializerList | propertyAssignment | 'at' position)*
+     (path 'at' position)?;
+command: C|D|M|P|E|U|S|L;
+component: COMPONENT;
+path: step ('/' step)*;
+step: COMPONENT selector? | STRING | INT;
+selector: '[' (predicate (',' predicate)*)? ']';
+predicate: NAME ('@' NAME)? '=' STRING | INT;
+initializerList: '(' initializer (',' initializer)* ')';
+initializer: NAME ('@' NAME)? '=' STRING | STRING | component initializerList;
+propertyAssignment: '(' NAME ('@' NAME)? ('^' NAME)? ('=' STRING)? ')';
+position: 'beginning'|'end'|'index' INT;
+COMPONENT: [a-z];
+C: 'c'; D: 'd'; M: 'm'; P: 'p'; E: 'e'; U: 'u'; S: 's'; L: 'l';
+NAME: [a-zA-Z_][a-zA-Z0-9_-]*;
+INT: [0-9]+;
+STRING: '"' ('\\' . | ~["\\])* '"' | '\'' ('\\' . | ~['\\])* '\'';
+WS: [ \t]+ -> skip;
+COMMENT: '#' ~[\r\n]* -> skip;
+NEWLINE: '\r'? '\n';
