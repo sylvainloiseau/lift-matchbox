@@ -245,7 +245,7 @@ The table is exhaustive and normative for semantic validation.
 The multitext datatype is a map of String values sub-entries, each value being
 associated with a distinct language (as the keys of a map). A multitext cannot
 have multiple string values for the same language. The name of a multitext value
-+ the name of a language, addressing one of its subentry, is called a "qualified
++ the name of a language, selecting one of its sub-entry, is called a "qualified
 property", its value is a "qualified property value".
 
 A Lift Dictionary has two sets of languages: Object languages (languages that are
@@ -288,7 +288,7 @@ be rejected with an ILLEGAL_LANGUAGE error.
 
 Each component has only one ID.
 
-### 4.4 Syntax for addressing qualified values of multitext property
+### 4.4 Syntax for refering to qualified values of multitext property
 
 The availability of keys is property-specific: some properties have a `lang`
 key, some have a `type` key, and some can have both.
@@ -305,10 +305,10 @@ transcription@tww
 
 `@<lang>` can appears only on multitext propertie names.
 
-The keys allow to address the qualified string value of a multitext property
-value, i.e. "sub-entries" that can be selected by language and type.
+The `@lang` key allow to refer to a qualified string value of a multitext property
+value, i.e. a "sub-entries".
 
-The following properties support a language:
+The following properties support a language key:
 
 ```text
 form
@@ -320,7 +320,7 @@ label
 transcription
 ```
 
-The following properties support neither key, their are scalar string values:
+The following properties do not support a language key, their are scalar values:
 
 ```text
 hn
@@ -331,14 +331,13 @@ target
 url
 ```
 
-The validator MUST reject unsupported keys. For example, the following are
-invalid:
+The validator MUST reject a combination of a scalar property with a language keys with error 'LANG_KEY_NOT_SUPPORTED_ON_SCALAR'. For example, the following are invalid:
 
 ```text
 category@en
 ```
 
-## 5. Addressing component with component identity in selectors and commands
+## 5. Selecting component using component identity properties in selectors and commands
 
 ### 5.1 Selector syntax
 
@@ -382,9 +381,9 @@ instance, under a given entry, no two senses can have the same gloss value (for
 any meta language). Under different parents, however, two senses can have the
 same qualified gloss.
 
-Some components have one identity property, for instance Sense. Some components
-have two identity properties, for instance Variant: this is the combination of
-the two values that allows to uniquely address the component.
+Some components have one identity property, for instance `Sense`. Some components
+have two identity properties, for instance `Variant`: this is the combination of
+the two values that allows to uniquely identify the component under a given parent.
 
 These identity properties are not a persistent, invariant identity. The gloss of a sense can be changed. They are all natural identity properties.
 
@@ -418,7 +417,7 @@ of sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
-### 5.3 Pseudo-properties used for addressing
+### 5.3 Pseudo-properties used for selecting component
 
 These pseudo properties are defined. They do not participate in component identity.
 
@@ -460,20 +459,20 @@ Here is a normative summary of the ID rule:
 
 Homophones are pervasive in language and therefore in dictionary entries. Since
 entries are not grouped in small sets under parents, but are all directly under
-the root, they are not easy to address.
+the root, they are not easy to select.
 
 The 'form' property CAN be used alone in a selector for an entry, but if there are several matches (i.e. homophones), an error 'AMBIGUOUS_REFERENCE' will be raised. If there is only one match, the selector succeeds.
 
 For Entry, only the ID is a property that can uniquely identify an instance. However, IDs are arbitrary and not very human-readable. IDs CAN be used in a selector, but are not a satisfying solution from a practical point of view.
 
 For practical purposes, two pseudo-properties are offered that can be expressed
-together with the 'form' property to disambiguate homophone entries and address
-uniquely an entry. Since these are an addressing mechanism, these two pseudo-properties:
+together with the 'form' property to disambiguate homophone entries and select
+uniquely an entry. Since these are an selecting mechanism, these two pseudo-properties:
 - can be used only in selectors,
 - can be used in a upsert command (but are used only in the select branch, while they have no effect in its create branch),
 - in ensure command.
 
-They cannot be used with the create command. They are not natural identity properties, since they refer to the context outside of the entry itself.
+They cannot be used with the `create` command. They are not natural identity properties, since they refer to the context outside of the entry itself.
 
 1/ The first pseudo-property is the homophone number (hn).
 
@@ -483,7 +482,7 @@ homophone number ('hn').
 The homophone number ('hn') is not a natural identity property: on a given
 entry, it depends on the number of other entries with the same form, which is not
 a natural property of the entry itself. However, the form + the homophone number
-('hn') allows to uniquely address an entry in the dictionary at any given state of the dictionary: two entries can have
+('hn') allows to uniquely select an entry in the dictionary at any given state of the dictionary: two entries can have
 the same qualified form, but no two entries can have the same value for both
 the qualified form and the homophone number ('hn'). It is a contextual lookup key rather than an identity property.
 
@@ -960,8 +959,8 @@ of entry[form@tww = "mami"]
 
 While each `of` clause explicitly selects a component among its siblings, `within` allows for a existential filtering strategy. The logic is : *Keep parent P if ∃ child C in P such that C matches selector S.*
 
-- with `of`, a node is selected if it satisfies its own selectors that contain the identity property and that address it uniquely
-- with `within`, a component is selected if, first, one or more components are matched, through selectors (filtering through any properties, not the complete identity property set) and, second, is the only member of the match set that has the specified child (at the left of the `within` selector).
+- with `of`, a component is selected if it satisfies its own selectors. As mentioned, the selector must contains all the identity properties so that the component is selected unambiguously.
+- with `within`, a component is selected if, first, it belongs to one or more components selected (the selector at the right of `within` can contain any number of properties, identity property or not) and if, secondly, it is the only member of the match set that has the specified child (mentioned in selector at the left of the `within` selector).
 
 For instance, in the following example, the sense is after a `within` clause.
 - it is then allowed to use any property as a selector, for instance the category property that is not an identity property
@@ -995,7 +994,11 @@ CHILD[SELECTOR] within PARENT[SELECTOR]
 within PARENT[SELECTOR]
 ```
 
-`within` may appear exactly where an `of` clause may appear. In the following command, COMMAND operates on a target component; `under IMMEDIATE_PARENT` then addresses the parent of this target, and `within` addresses the next parent:
+`within` may appear exactly where an `of` clause may appear. In the following syntax schema:
+- `within` select a set of one or more ancestors;
+- then it filter these ancestor to those having the child component describe at its left (in the `under` clause)
+- if only one subtree remains, we proceed to the command
+- COMMAND operates on the target component
 
 ```text
 COMMAND
@@ -1037,7 +1040,7 @@ within NEXT_PARENT
 
 #### Properties allowed in a `within` selectors
 
-The selector of a `within` clause may contain any property of the component, not only the identity properties, since a `within` clause is not responsible for uniquely addressing one component alone. This excludes the pseudo-predicates that are not directly manageable: 'hn', 'has-gloss', 'index', 'ID'.
+The selector of a `within` clause may contain any property of the component, not only the identity properties, since a `within` clause is not responsible for uniquely and unambiguously selecting one component alone. This excludes the pseudo-predicates that are not directly manageable: 'hn', 'has-gloss', 'index', 'ID'.
 
 #### Selection algorithm
 
@@ -1077,7 +1080,7 @@ within entry[form="mami"]
 
 #### Difference between `of` and `within`
 
-An `of` clause identifies the immediate parent of the preceding component in a chain where each step is uniquely addressed.
+An `of` clause identifies the immediate parent of the preceding component in a chain where each step is uniquely and unambiguously selected.
 
 ```text
 set definition@en = "A definition"
@@ -1085,7 +1088,7 @@ on sense[gloss@en = "foo"]
 of entry[form@tww = "mami"]
 ```
 
-A `within` clause describes a chain of parent-child relations with potentially partial information (not sufficient to uniquely address the node) on each step, the resolver being in charge of finding a complete chain that satisfies all the constraints:
+A `within` clause describes a chain of parent-child relations with potentially partial information (not sufficient to uniquely select the node) on each step, the resolver being in charge of finding a complete chain that satisfies all the constraints:
 
 ```text
 set definition@en = "A definition"
@@ -1460,8 +1463,7 @@ If the property is absent, the error is `PROPERTY_NOT_FOUND`.
 The same rule as above (under "set") regarding language applies: lang can be
 implicit.
 
-In the following example, the default language is used for addressing a specific
-definition sub-entry:
+In the following example, the default language is used in order to qualify the definition property:
 
 ```text
 update definition =
@@ -1786,7 +1788,7 @@ The components are the same as in the LIFT-DSL language. They are referred to by
 
 ### 2.3. Properties short codes
 
-The properties on components are the same as in LIFT-DSL language, they are addressed with a single letter code:
+The properties on components are the same as in LIFT-DSL language, they are refered to with a single letter code:
 
 | Property | Concise LIFT-DSL |
 |---:|---|
