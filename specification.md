@@ -2202,7 +2202,7 @@ clear category
 
 ## 6. Simplified path and initializers
 
-### 6.1 Dropping component and field name for entry's form and sense's gloss
+### 6.1 Dropping component name and property name for entry's `form` and sense's `gloss` in path
 
 1/ If the first step of a path is a single string between single or double quotes, then it is the form of an entry:
 
@@ -2352,6 +2352,46 @@ This means that in the following example for example, the field initializer crea
 
 ```
 c /"mami"/"pig" f("editorial", "To be checked")
+```
+
+### 6.3 Specifying language code when the property name is dropped
+
+In the two preceding sections, 6.1 and 6.2, new constructions were introduced where the property name is dropped.
+
+For all this abbreviated property value notations, if an explicit language code must be given, it is suffixed to the value itself.
+
+Consider the following notations:
+
+- language code with quoted string for entry form and sense gloss:
+
+```
+/"mami"@tww
+```
+
+```
+/"mami"@tww/"pig"@en
+```
+
+- language code with unquoted string for entry form and sense gloss:
+
+```
+/mami@tww
+```
+
+```
+/mami@tww/pig@en
+```
+
+- language code when creating an entry with abbreviated initalizer
+
+```
+c e("mami"@pig)
+```
+
+- creating an example, expressing language code on sense gloss (in path) and example text only:
+
+```
+c /"mami"/"pig"@de x("a mami jefi"@en)
 ```
 
 ## 7. Embedding initializer
