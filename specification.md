@@ -484,7 +484,7 @@ uniquely an entry. Since these are an selecting mechanism, these two pseudo-prop
 
 They cannot be used with the `create` command. They are not natural identity properties, since they refer to the context outside of the entry itself.
 
-1/ The first pseudo-property is the homophone number (hn).
+##### 5.3.2.1 The first pseudo-property is the homophone number (hn).
 
 All homophonous entries share the same qualified form, but have a different
 homophone number ('hn').
@@ -543,7 +543,9 @@ In other word, if an entry as form in several languages, and that there at least
 one of its qualified forms that is in a homophone set, its homophone number is the size of the
 greatest homophone set + 1.
 
-2/ In order to deal with homophone issues, a pseudo-property 'has-gloss' is also
+##### 5.3.2.1 The `has-gloss` pseudo-predicate
+
+In order to deal with homophone issues, a pseudo-property 'has-gloss' is also
 defined.
 
 The 'has-gloss' pseudo-property value must be qualified with a language code (or with implicit default language) and
@@ -986,7 +988,7 @@ within sense[category = "Verb"]
 of entry[form@tww = "mami", hn=2]
 ```
 
-#### Syntax
+#### 7.3.1 Syntax
 
 The `within` clause chains a PARENT component (to the right) with a child component (to the left). Several `within` clauses can be consecutive.
 
@@ -1047,11 +1049,11 @@ within NEXT_PARENT
 within NEXT_PARENT
 ```
 
-#### Properties allowed in a `within` selectors
+#### 7.3.2 Properties allowed in a `within` selectors
 
 The selector of a `within` clause may contain any property of the component, not only the identity properties, since a `within` clause is not responsible for uniquely and unambiguously selecting one component alone. This excludes the pseudo-predicates that are not directly manageable: 'hn', 'has-gloss', 'index', 'ID'.
 
-#### Selection algorithm
+#### 7.3.3 Selection algorithm
 
 With a `within` clause chain, the selection follows the following algorithm:
 
@@ -1089,7 +1091,7 @@ within entry[form="mami"]
 - according to 2, it then moves to the left of the `within` clause, which has a selector containing `sense[gloss="pig"]`. It applies this filter to the previously selected entries. Suppose that two entries have a sense child with a category "Noun".
 - according to 3, step 2 is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For the two senses selected at the end of the previous step, we look for an example with the given text. If one sense has this example, then the corresponding subtree rooted at an entry (the beginning of the `within` chain) is kept. If several senses have such an example, then an `AMBIGUOUS_REFERENCE` exception is raised. If no sense has such an example, then a `NOT_FOUND` is raised.
 
-#### Difference between `of` and `within`
+#### 7.3.4 Difference between `of` and `within`
 
 An `of` clause identifies the immediate parent of the preceding component in a chain where each step is uniquely and unambiguously selected.
 
@@ -1109,7 +1111,7 @@ within entry[form@tww = "mami"]
 ```
 
 
-#### Existential filtering with the selected child
+#### 7.3.5 Existential filtering with the selected child
 
 When a `within` clause is used, the parent selector is evaluated together with the already selected descendant path.
 
@@ -1138,7 +1140,7 @@ entry[form@tww = "mami"]
 
 The parent selector does not independently select an unrelated sense elsewhere in the dictionary.
 
-#### Cardinality
+#### 7.3.6 Cardinality
 
 The complete constrained path must resolve to exactly one valid target for commands that require one target.
 
@@ -1151,7 +1153,7 @@ The following errors apply:
 
 The ancestor is valid only if exactly one complete matching descendant path exists.
 
-#### No implicit creation
+#### 7.3.7 No implicit creation
 
 A `within` clause is always a selector constraint. It never creates an ancestor or any intermediate component.
 
@@ -1165,11 +1167,11 @@ within entry[form@tww = "mami"]
 
 This command does not create the entry or the sense. If either component is absent, the command fails.
 
-#### Blocks
+#### 7.3.8 Blocks
 
-`within` is not allowed inside a block.
+`within` is not allowed inside a block (see section "11" for the definition of block construct).
 
-#### Assessment
+#### 7.3.9 Assessment
 
 The `within` clause solves a real problem: selecting a child component while ensuring that its containing entry is the intended homophone entry. It makes a relationship such as:
 
@@ -1237,7 +1239,7 @@ upsert sense(
 )
 ```
 
-#### The special case of entry
+#### 8.1.1 The special case of entry
 
 For entry, a component with the same value for the `form` property may exist; the following should
 work, even if an entry already exists with the same qualified form:
@@ -1246,7 +1248,7 @@ work, even if an entry already exists with the same qualified form:
 create entry(form@tww = "mami")
 ```
 
-#### to POSITION clause
+#### 8.1.2 to POSITION clause
 
 The create command allows an optional "at POSITION" clause, which specifies the
 index at which to insert the component under the parent list of
@@ -1630,9 +1632,9 @@ These rules regarding reference apply to every target property on:
 When an identical component with the same type and the same target already exists,
 the creation of a Variant, Relation, or Reversal component should fail with 'DUPLICATE_REFERENCE'.
 
-## 11. Block syntax
+## 11. Block construct
 
-Blocks provide convenient syntax for related operations while preserving explicit component construction.
+Blocks provide convenient construct for related operations while preserving explicit component construction.
 
 A curly brace block is a syntactic construct that groups related commands together, and anchors them to a common parent
 
@@ -1989,9 +1991,9 @@ delete example[index = 1]
 
 As with the reference syntax, the index selector cannot occur together with any other selectors in the square brackets.
 
-## Command syntax details
+## 5. Command syntax details
 
-### Create, upsert, ensure: commands with initializers
+### 5.1 Create, upsert, ensure: commands with initializers
 
 Commands with initializer are identical to the initializer + `under` in the reference language.
 
@@ -2026,7 +2028,7 @@ under sense(gloss="pig")
 within entry[form="mami"]
 ```
 
-### Delete
+### 5.2 Delete
 
 The `delete` command deletes the last step of the path.
 
@@ -2059,7 +2061,7 @@ delete example[text="a mami jefi"]
 
 As stated earlier, the steps in the path are linked according to the semantics of `within`.
 
-### Move
+### 5.3 Move
 
 ```LiftPathShort
 m /e[f="mami"]/s[g="pig"] at index 1
@@ -2092,7 +2094,7 @@ move example[index = 1]
 
 `beginning`, `end`, and `index n` have exactly the reference-language semantics,
 
-### Set
+### 5.4 Set
 
 ```LiftPathShort
 s /e[f="mami"]/s[g="pig"] (c = "Noun")
@@ -2106,7 +2108,7 @@ set category = "Noun"
   within entry[form="mami"]
 ```
 
-### Update
+### 5.5 Update
 
 ```LiftPathShort
 u /e[f="mami"]/s[g="pig"] (c = "Verb")
@@ -2120,7 +2122,7 @@ update category = "Verb"
   within entry[form="mami"]
 ```
 
-### Clear
+### 5.6 Clear
 
 ```LiftPathShort
 l /e[f="mami"]/s[g="pig"] (c)
@@ -2134,9 +2136,9 @@ clear category
   within entry[form="mami"]
 ```
 
-## Simplified path and initializers
+## 6. Simplified path and initializers
 
-### droping component and field name for entry's form and sense's gloss
+### 6.1 droping component and field name for entry's form and sense's gloss
 
 1/ If the first step of a path is a single string between single or quotes, then it is the form of an entry:
 
@@ -2199,11 +2201,11 @@ Then, the following command create a sense with gloss "pig" in the default meta 
 c /mami/pig
 ```
 
-### Droping property name in initializer
+### 6.2 Droping property name in initializer
 
 The following initializers can drop the property name under the following conditions:
 
-#### Entry
+#### 6.2.1 `entry`
 
 If an `entry` initializer has no property name and equal sign before the assigned string, then it is the entry form
 
@@ -2223,7 +2225,7 @@ i.e., in reference syntax:
 create entry(form="mami")
 ```
 
-#### Sense
+#### 6.2.2 `Sense`
 
 If a `sense` initializer has no field name and equal sign before the assigned string, then it is the sense gloss:
 
@@ -2246,7 +2248,7 @@ upsert sense(gloss="pig")
 under entry[form="mami"]
 ```
 
-#### Example
+#### 6.2.3 `Example`
 
 If an `example` initializer has a string without property name it is the example text.
 
@@ -2271,7 +2273,7 @@ create example(text="a mami jefi")
 
 ```
 
-#### Default argument for other initializer
+#### 6.2.4. Default argument for other initializer
 
 The following table show how many unamed string argument are allowed for the initializers of the different component type, and to which properties they map
 
@@ -2288,7 +2290,7 @@ This means that in the following example for example, the field initializer crea
 c /"mami"/"pig" f("editorial", "To be checked")
 ```
 
-## Embedding initializer
+## 7. Embedding initializer
 
 An embedded component creation is allowed *into* a component initalizer for creating a child on the fly.
 
@@ -2319,7 +2321,7 @@ Embedded creation rules also include:
 - an embedded creation uses the semantics of `create` (meaning that an error is raised if the child already exists)
 - nested embedded initializers are allowed
 
-## An idiosyncratic construct
+## 8. An idiosyncratic construct
 
 The following `upsert` construct, without a constructor after the path,
 means:
@@ -2340,7 +2342,7 @@ p /mami/pig
 ```
 
 
-## A final example
+## 9. A final example
 
 Using implicit field name and embedded initializers, considere the following command:
 
