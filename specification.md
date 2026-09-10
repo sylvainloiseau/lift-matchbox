@@ -1106,12 +1106,12 @@ within entry[form="mami"]
 ```
 
 - the resolver starts with the last `within` clause: it selects all entries matching `entry[form="mami"]`. If no entry matches, it raises 'NOT_FOUND'. Suppose that four entries have this form.
-- it then moves to the left of the `within` clause, which has a selector containing `sense[gloss="pig"]`. It applies this filter to the previously selected entries. Suppose that two entries have a sense child with a category "Noun" (on the same entry or not). Two candidate path remain.
+- it then moves to the left of the `within` clause, which has a selector containing `sense[gloss="pig"]`. It applies this filter to the previously selected entries. Suppose that two entries have a `sense` child with a category "Noun" (on the same entry or not). Two candidate paths remain.
 - step 2 is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For the two senses selected at the end of the previous step, we look for an example with the given text. If one sense has this example, then the corresponding candidate paths rooted at an entry (the beginning of the `within` chain) is kept. If several senses have such an example, then an `AMBIGUOUS_REFERENCE` exception is raised. If no sense has such an example, then a `NOT_FOUND` is raised.
 
 #### 7.3.4 Difference between `of` and `within`
 
-An `of` clause identifies the immediate parent of the preceding component in a chain where each step is uniquely and unambiguously selected.
+An `of` clause identifies the immediate parent of the preceding component in a chain of child-parent where each step is uniquely and unambiguously selected.
 
 ```LiftPathRef
 set definition@en = "A definition"
@@ -1119,7 +1119,7 @@ on sense[gloss@en = "foo"]
 of entry[form@tww = "mami"]
 ```
 
-A `within` clause describes a chain of parent-child relations with potentially partial information (not sufficient to uniquely select the node) on each step, the resolver being in charge of finding a complete chain that satisfies all the constraints:
+A `within` clause describes a chain of child-parent with potentially partial information (not sufficient to uniquely select the component) on each step, the resolver being in charge of finding a complete chain that satisfies all the constraints:
 
 ```LiftPathRef
 set definition@en = "A definition"
