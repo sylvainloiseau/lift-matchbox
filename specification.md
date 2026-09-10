@@ -52,8 +52,8 @@ The LiftPatchShort commands are expressed on a single line. It can be mixed with
 
 LiftPatchShort commands are:
 
-- lines starting with one of the command verbs (or its single-letter
-abbreviation) followed by whitespace (see the full description under Part 3)
+- lines starting with optional withespace followed by one of the single-letter command
+abbreviation, followed by whitespace (see the full description under Part 3)
 - special instructions `language-default` and `language-create` 
 
 In both syntaxes, string are quoted by single or double quotes; a single quote is escaped as '' in a single-quoted string; double quote is escaped as \" in a double-quoted string.
@@ -665,11 +665,14 @@ Using the 'has-gloss' property with a create command will result in an error 'IL
 
 #### 5.3.3 Ordinal selectors
 
-Another pseudo-property is `index`; its value is an integer, without quotes.
+Another pseudo-property is `index`; its value is an integer, without quotes. It is an order-dependent selector, depending on the order of the node amongst its sibling.
 
-It is an order-dependent selector, depending on the order of the node amongst its sibling.
+- `index` can be used with any component type excepted `entry`.
+- The ordinal selector start at 1.
+- index cannot be mixed with any other property in a selector.
+- if the index value is < 0 or greater that the number of siblings, an INDEX_OUT_OF_BOUNDS exception is raised.
 
-`index` can be used with any component type but entry.
+An `index` cannot be set by any initializer. Therefore, they can used only in selection operations (as lookup predicates),  the move command, but not in a `create` command, not with an `ensure` command, and not with `upsert` command.
 
 In the following example, the second sense in the sense list is selected:
 
@@ -686,14 +689,10 @@ of entry[
 ]
 ```
 
-The ordinal selector start at 1.
-
 The previous command will raise INDEX_OUT_OF_BOUNDS exception if there is not at
 least two sense under that entry.
 
-index cannot be mixed with any other property in a selector.
 
-index cannot be set by any initializer. Therefore, they can used only in selection operations (as lookup predicates), with an ensure command, the selector branch of an upsert command, the move command, but not in a create command.
 
 In order to change an index, use the move command.
 
@@ -1038,7 +1037,7 @@ within PARENT[SELECTOR]
 `within` may appear exactly where an `of` clause may appear. In the following syntax schema:
 - `within` select a set of one or more ancestors;
 - then it filter these ancestor to those having the child component describe at its left (in the `under` clause)
-- if only one subtree remains, we proceed to the command
+- if only one candidate path remains, we proceed to the command
 - COMMAND operates on the target component
 
 ```text
@@ -1085,17 +1084,6 @@ The selector of a `within` clause may contain any property of the component, not
 
 #### 7.3.3 Selection algorithm
 
-With a `within` clause chain, the selection follows the following algorithm:
-
-1. The resolver uses the selector of the component selected by the last `within` clause.
-   - if it matches no component, 'NOT_FOUND' is raised.
-   - if it must match *one or more components*, the resolver keeps this set of components. This is completely different from the `of` clause, which must match exactly one component.
-2. the validator then considers the selector at the left of the `within` clause.
-   - This selector is used to filter out the previously selected subtrees: only the subtrees whose last child has a child of the corresponding kind that matches the selector is kept. Here, the last selected child is the subtree root.
-   - if no subtrees are found, a 'NOT_FOUND' is raised.
-3. Step 2 is repeated with the other `within` clauses in the clause chain (in reverse declaration order): the validator considers the selector at the left of the previous clause, and it must applied it to the child found during the previous step. When these parents do not have the corresponding child, the corresponding subtree rooted at the beginning of the `within` clause chain is filtered out.
-4. When the last `within` clause is executed, exactly one subtree must be left. If, at the end, more than one subtree remains, an 'AMBIGUOUS_REFERENCE' is raised.
-
 Here is an example. Let's focus on the following example.
 
 ```LiftPathRef
@@ -1118,8 +1106,8 @@ within entry[form="mami"]
 ```
 
 - according to 1, the resolver starts with the last `within` clause: it selects all entries matching `entry[form="mami"]`. If no entry matches, it raises 'NOT_FOUND'. Suppose that four entries have this form.
-- according to 2, it then moves to the left of the `within` clause, which has a selector containing `sense[gloss="pig"]`. It applies this filter to the previously selected entries. Suppose that two entries have a sense child with a category "Noun".
-- according to 3, step 2 is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For the two senses selected at the end of the previous step, we look for an example with the given text. If one sense has this example, then the corresponding subtree rooted at an entry (the beginning of the `within` chain) is kept. If several senses have such an example, then an `AMBIGUOUS_REFERENCE` exception is raised. If no sense has such an example, then a `NOT_FOUND` is raised.
+- according to 2, it then moves to the left of the `within` clause, which has a selector containing `sense[gloss="pig"]`. It applies this filter to the previously selected entries. Suppose that two entries have a sense child with a category "Noun" (on the same entry or not). Two candidate path remain.
+- according to 3, step 2 is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For the two senses selected at the end of the previous step, we look for an example with the given text. If one sense has this example, then the corresponding candidate paths rooted at an entry (the beginning of the `within` chain) is kept. If several senses have such an example, then an `AMBIGUOUS_REFERENCE` exception is raised. If no sense has such an example, then a `NOT_FOUND` is raised.
 
 #### 7.3.4 Difference between `of` and `within`
 
@@ -1199,7 +1187,7 @@ This command does not create the entry or the sense. If either component is abse
 
 #### 7.3.8 Blocks
 
-`within` is not allowed inside a block (see section "11" for the definition of block construct).
+`within` is allowed in the header of a block (see section "11" for the definition of block construct) for selecting the parent targeted by the command(s) in the block body.
 
 #### 7.3.9 Assessment
 
@@ -2379,10 +2367,8 @@ Embedded initializers necessarily translate into block syntax with embedded `ups
 
 ```
 sense[gloss="pig"] within entry[form="mami"] {
-  upsert sense(gloss="pig") {
-    upsert example(text="a mami jefi") {
-      upsert translation(text="I shot a pig", type="literal") {
-      }
+  upsert example(text="a mami jefi") {
+    upsert translation(text="I shot a pig", type="literal") {
     }
   }
 }
