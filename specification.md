@@ -174,8 +174,8 @@ illegal parent) must fail with an 'ILLEGAL_PARENT' error.
 
 All parents can have multiple child components of the same type. For
 instance, a `sense` component can have multiple `example` children. The children
-can be addressed by their position in the parent's list of children (see below
-"Ordinal selector").
+can be selected by their position in the parent's list of children (see below section
+"5.3.3 Ordinal selectors").
 
 ## 4. Lift Properties
 
@@ -185,7 +185,7 @@ A **property** is a LIFT datafield such as `form`, `gloss`, or `definition`, tha
 
 The following table lists the properties. Each row gives a property name; the following columns indicate:
 - The `Component` column: on which components the property is available
-- The `Property` column: name of the property. Several components may have a property with the same name. Therefore, a property is uniquely addressed by (component name, property name).
+- The `Property` column: name of the property. Several components may have a property with the same name. Therefore, a property is unambiguously referred to by (component name, property name).
 - The `Datatype` column: which is the datatype of the property:
   - Scalar properties:
     - String,
@@ -198,7 +198,7 @@ The following table lists the properties. Each row gives a property name; the fo
   - `M` — meta language qualifier required or defaultable, for example `gloss@en`.
   - `—` — no language qualifier.
 - `Required at creation`: indicate whether this property must be initialized with a value at creation. For a multitext, this means that at least one qualified value must be set.
-- `Natural identity`: indicate if this property participates in the *natural identity* of the component. The natural identity allows to uniquely address a component amongst its sibling same-type component instances, under the same parent. A component can have one property defining its natural identity, or several properties (max two): in that case, the natural identity is the combination of the value of the two properties. When a multitext is part of a natural identity, it means that any of its qualified values can be used for the natural identity, not all its values.
+- `Natural identity`: indicate if this property participates in the *natural identity* of the component. The natural identity allows to unambiguously select a single component, amongst its sibling same-type component instances, under a given parent. A component can have one property defining its natural identity, or several properties (max two): in that case, the natural identity is the combination of the value of the two properties. When a multitext is part of a natural identity, it means that any of its qualified values can be used for the natural identity, not all its values.
 
 The table is exhaustive and normative for semantic validation.
 
@@ -958,10 +958,10 @@ of entry[form@tww = "mami"]
 
 ### 7.1 Replacing `of` with `within` for existential filtering semantics
 
-While each `of` clause explicitly selects a component among its siblings, `within` allows for a existential filtering strategy.
+While each `of` clause explicitly selects a component among its siblings, `within` allows for a existential filtering strategy. The logic is : *Keep parent P if ∃ child C in P such that C matches selector S.*
 
 - with `of`, a node is selected if it satisfies its own selectors that contain the identity property and that address it uniquely
-- with `within`, a node is selected if, first, it is matched, together with others, through non-unique selectors (filtering through any properties, not the complete identity property set) and, second, is the only member of the match set that has the specified child (at the left of the `within` selector).
+- with `within`, a component is selected if, first, one or more components are matched, through selectors (filtering through any properties, not the complete identity property set) and, second, is the only member of the match set that has the specified child (at the left of the `within` selector).
 
 For instance, in the following example, the sense is after a `within` clause.
 - it is then allowed to use any property as a selector, for instance the category property that is not an identity property
@@ -1039,9 +1039,9 @@ within NEXT_PARENT
 
 The selector of a `within` clause may contain any property of the component, not only the identity properties, since a `within` clause is not responsible for uniquely addressing one component alone. This excludes the pseudo-predicates that are not directly manageable: 'hn', 'has-gloss', 'index', 'ID'.
 
-#### Resolver algorithm
+#### Selection algorithm
 
-With a `within` clause chain, the resolver follows the following algorithm:
+With a `within` clause chain, the selection follows the following algorithm:
 
 1. The resolver uses the selector of the component selected by the last `within` clause.
    - if it matches no component, 'NOT_FOUND' is raised.
