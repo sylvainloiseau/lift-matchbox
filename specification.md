@@ -1101,7 +1101,7 @@ In the previous example:
 
 ```text
 of example[text="a mami jefi"]
-within sense[category="Noun"]
+within sense[gloss="pig"]
 within entry[form="mami"]
 ```
 
