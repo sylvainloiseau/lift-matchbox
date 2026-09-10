@@ -343,6 +343,11 @@ category@en
 
 Square brackets always select existing objects. It never creates an object. Parents are not implicitly created by a selector. Parent creation is explicit.
 
+We distinguish:
+
+- a *parent selector*: it is a selector in a `of`, `under`, `in` and `within` clause.
+- a *command selector*: it is the selector of the component directly targeted by a delete, ensure or move command.
+
 The selector may contain: 
 
 - for Entry and Sense: an ID  (see section "5.3.1 IDs")
@@ -418,6 +423,10 @@ of sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
+#### Identity and multitext property
+
+When a multitext property is a natural identity property, the uniqueness means that, when iterating on the relevant language set languages, for components having a value value set for this language and this property, there is no duplicate. Unset qualified value does not count in the identity checking.
+
 ### 5.3 Pseudo-properties used for selecting component
 
 These pseudo properties are defined. They do not participate in component identity.
@@ -452,8 +461,8 @@ present after initialization.
 Here is a normative summary of the ID rule:
 
 - The ID cannot be set, deleted, initialized during creation, or cleared.
-- The ID can be used as a lookup predicate
-- The ID can be used as a lookup predicate in an upsert or ensure command, but will not be set in the creation branch of an upsert command.
+- The ID can be used as a lookup predicate on parent selector (in `of`, `under`, `on` and `within` clause)
+- The ID can be used as a lookup predicate with the `move` and `delete` command.
 
 
 #### 5.3.2 The case of entry: disambiguation of homophone entries with 'hn' and 'has-gloss'
@@ -582,8 +591,7 @@ have `form@tww = "mami"`, even if there is only one entry with `form@tww =
 ```LiftPathRef
 
 create example(
-  text@tww = "a mami jefi",
-  translation@en = "I shot a pig"
+  text@tww = "a mami jefi"
 )
 under sense[
   gloss@en = "pig"
@@ -603,8 +611,7 @@ Instead, `has-gloss` could be used in such a case to disambiguate:
 
 ```LiftPathRef
 create example(
-  text@tww = "a mami jefi",
-  translation@en = "I shot a pig"
+  text@tww = "a mami jefi"
 )
 under sense[
   gloss@en = "pig"
@@ -619,8 +626,7 @@ Another option could be to use `within`, as described in section "7.1" below:
 
 ```LiftPathRef
 create example(
-  text@tww = "a mami jefi",
-  translation@en = "I shot a pig"
+  text@tww = "a mami jefi"
 )
 under sense[
   gloss@en = "pig"
@@ -650,8 +656,7 @@ In the following example, the second sense in the sense list is selected:
 
 ```LiftPathRef
 create example(
-  text@tww = "a mami jefi",
-  translation@en = "I shot a pig"
+  text@tww = "a mami jefi"
 )
 under sense[
   index = 2
@@ -677,17 +682,17 @@ In order to change an index, use the move command.
 
 The following table is normative.
 
-| Property kind | `create` | `upsert` | `ensure` | on parent selector (in `under`, `on`, `within` clause)| `set` | `update` | `clear` |
-|---|---|---|---|---|---|---|---|
-| Required identity property | required | required | required | allowed | allowed, subject to uniqueness | allowed, subject to uniqueness | only if the component remains valid |
-| Optional natural property | allowed | allowed; uses set semantics | forbidden | allowed only if part of identity | allowed | allowed if present | allowed |
-| Required non-identity property | required | allowed | forbidden | not allowed unless explicitly defined | allowed | allowed | only if another value remains |
-| Optional scalar property | allowed | allowed | forbidden | allowed only if declared identity | allowed | allowed if present | allowed |
-| Optional multitext property | one or more qualifiers | one or more qualifiers | forbidden | one qualifier only if identity | one qualifier | one qualifier | one qualifier or all qualifiers |
-| System-managed ID | forbidden | forbidden | forbidden | allowed where IDs are supported | forbidden | forbidden | forbidden |
-| `hn` | forbidden | forbidden as initializer | forbidden | allowed only with `form` | not as a property target | not as a property target | forbidden |
-| `has-gloss` | forbidden | forbidden as initializer | forbidden | entry selector only, allowed with `form` | forbidden | forbidden | forbidden |
-| `index` | forbidden | forbidden | forbidden | as sole selector only | forbidden | forbidden | forbidden |
+| Property kind | `delete` | `move` | `create` | `upsert` | `ensure` | on parent selector (in `under`, `on`, `within` clause)| `set` | `update` | `clear` |
+|---|---|---|---|---|---|---|---|---|---|
+| Required identity property | required | required | required | required | required | allowed | allowed, subject to uniqueness | allowed, subject to uniqueness | only if the component remains valid |
+| Optional natural property | allowed | allowed | allowed | allowed; uses set semantics | forbidden | allowed only if part of identity | allowed | allowed if present | allowed |
+| Required non-identity property | required | required | required | allowed | forbidden | not allowed unless explicitly defined | allowed | allowed | only if another value remains |
+| Optional scalar property | forbidden | forbidden | allowed | allowed | forbidden | allowed only if declared identity | allowed | allowed if present | allowed |
+| Optional multitext property | forbidden | forbidden | one or more qualifiers | one or more qualifiers | forbidden | one qualifier only if identity | one qualifier | one qualifier | one qualifier or all qualifiers |
+| System-managed ID | allowed (for component where IDs are supported) alone | allowed (for component where IDs are supported) alone | forbidden | forbidden | forbidden | allowed (for component where IDs are supported) | forbidden | forbidden | forbidden |
+| `hn `| allowed only with `form` | allowed only with `form` | forbidden | forbidden as initializer | forbidden | allowed only with `form` | not as a property target | not as a property target | forbidden |
+| `has-gloss` | allowed with `form` | allowed with `form` | forbidden | forbidden as initializer | forbidden | entry selector only, allowed with `form` | forbidden | forbidden | forbidden |
+| `index` | as sole selector only | as sole selector only | forbidden | forbidden | forbidden | as sole selector only | forbidden | forbidden | forbidden |
 
 Here `allowed` does not mean that every property is valid on every component. Availability is first determined by the property availability table.
 
@@ -786,21 +791,21 @@ For `create` and the creation branch of `upsert`:
 2. A required multitext property needs at least one qualified value.
 3. Multiple different language qualifiers for the same multitext property are allowed:
 
-   ```text
-   create example(
-     text@tww = "mami",
-     text@tpi = "pik"
-   )
-   ```
+```text
+create example(
+  text@tww = "mami",
+  text@tpi = "pik"
+)
+```
 
 4. Repeating the same qualified property is invalid:
 
-   ```text
-   create example(
-     text@tww = "mami",
-     text@tww = "different"
-   )
-   ```
+```text
+create example(
+  text@tww = "mami",
+  text@tww = "different"
+)
+```
 
    This should raise `DUPLICATE_PROPERTY`.
 5. `ensure` accepts only natural identity properties.
@@ -836,11 +841,10 @@ delete COMPONENT[SELECTOR] under PARENT
 move COMPONENT[SELECTOR] under COMPONENT[SELECTOR] at POSITION
 move COMPONENT[SELECTOR] at POSITION
 
-ensure entry(initializers)
 ensure COMPONENT(initializers) under PARENT
 ```
 
-'move' cannot be applied to entry.
+'move' and `ensure` cannot target an `entry` component.
 
 The three *property commands* (command directly targeting a property):
 
@@ -864,7 +868,7 @@ The language distinguishes the following cases:
 - `clear PROPERTY` removes the selected property value(s); if the
   property is not already set, an "UNSET_PROPERTY" error is raised.
 
-For all *property commands*, if the command refers to a property that does not exist on its parent type according to the table in section "4.", an error 'PROPERTY_NOT_FOUND' is raised.
+For all *property commands*, if the command refers to a property that does not exist on its parent type according to the table in section "4.", an error 'PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE' is raised.
 
 ### 7.1 Selecting direct parent with `under` or `on`
 
@@ -960,10 +964,14 @@ of entry[form@tww = "mami"]
 
 While each `of` clause explicitly selects a component among its siblings, `within` allows for a existential filtering strategy. The logic is : *Keep parent P if ∃ child C in P such that C matches selector S.*
 
-- with `of`, a component is selected if it satisfies its own selectors. As mentioned, the selector must contains all the identity properties so that the component is selected unambiguously.
-- with `within`, a component is selected if, first, it belongs to one or more components selected (the selector at the right of `within` can contain any number of properties, identity property or not) and if, secondly, it is the only member of the match set that has the specified child (mentioned in selector at the left of the `within` selector).
+`within` allow for intermediate multiplicity, but the final evaluation of a within chain must result in a single child component, otherwise an `AMBIGUOUS_REFERENCE` is raised. If no component is selected, an `NOT_FOUND` error is raised.
 
-For instance, in the following example, the sense is after a `within` clause.
+- with `of`, a component is selected if it satisfies its own selectors. As mentioned, the selector must contains all the identity properties so that the component is selected unambiguously.
+- with `within`, a component is selected if:
+  - first, it belongs to one or more components selected (the selector at the right of `within` can contain any number of properties, identity property or not, that allows for several matches)
+  - secondly, it is the only member in the previous match set that has the specified child (mentioned in selector at the left of the `within` selector).
+
+For instance, in the following example, a `sense` is mentioned after a `within` clause.
 - it is then allowed to use any property as a selector, for instance the category property that is not an identity property
 - several senses can then be matched
 - if only one of those has a child that matches the component to the left of the `within` clause, i.e. an example that has the text "a mami jefi", then the `within` succeeds. If several senses have a matching child, then an `AMBIGUOUS_REFERENCE` error is raised. If no sense satisfies its selector, or if no sense has a matching child, then a `NOT_FOUND` is raised.
@@ -1295,7 +1303,7 @@ identity properties mentioned in section "5.2 identity properties".
 
 Special rule with entry and sense:
 
-- with entry and sense: `upsert` cannot use an ID since an ID cannot be set. Use `ensure` with an ID on a sense or entry. Using an ID with upsert fails with the error `ID_NOT_ALLOWED_ON_UPSERT`.
+- with entry and sense: `upsert` cannot use an ID since an ID cannot be set. Using an ID with upsert fails with the error `ID_NOT_ALLOWED_ON_UPSERT`.
 - with entry, `upsert` can use either `hn` or `has-gloss`, both in conjunction with form. `hn` and `has-gloss` will be used for the selector branch of upsert. For the create branch, only form will be used and a new entry, possibly a homophone of an existing one, will be created.
 
 ### 8.3 Ensure
@@ -1314,6 +1322,8 @@ ensure sense(
 )
 under entry[form@tww = "mami"]
 ```
+
+`ensure` cannot be used with an `entry` since an entry as no natural identity property.
 
 ### 8.4 Delete a component
 
@@ -1384,6 +1394,7 @@ A move fails with a structured error if:
   - lower than 1 
   - greater than the number of components in the destination + 1 for a different-parent move
   - greater than the number of components in the destination for a same-parent move
+- the move will created a duplicate amongst the sibling set according to natural identity properties. The validation must iterate on pre-existing siblings and check that none has the same values than the new candidate sibling for the identity properties of this type of component. If a duplicate would be created, an error 'CANNOT_CREATE_DUPLICATE' must be raised. For multitext natural identity property, it means iterating on the relevant language set languages and check that, for the multitext having a value set for this language, there is no duplicate.
 
 The selectors will raise an exception if:
 
@@ -1439,6 +1450,8 @@ The previous command will set the value of the qualified value `definition@en`,
 it will not change any other qualified value existing on that property (say,
 `definition@fr`).
 
+If the `set` command target one of the natural identity properties of the component, the validation must iterate on siblings and check that none has the same values than the new candidate sibling for the identity properties of this type of component. If a duplicate would be created, an error 'CANNOT_CREATE_DUPLICATE' must be raised. When the targeted natural identity property is a multitext, it means to check the values qualified with the same languages on the other sibling components.
+
 ### 9.2 Update
 
 Update requires an existing target:
@@ -1459,7 +1472,8 @@ of sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
-If the property is absent, the error is `PROPERTY_NOT_FOUND`.
+- If the property does not exist on the parent component type according to the table in section "4.", an error 'PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE' is raised.
+- If the property was not already set, an 'UNSET_PROPERTY' error is raised.
 
 The same rule as above (under "set") regarding language applies: lang can be
 implicit.
@@ -1472,6 +1486,8 @@ update definition =
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
 ```
+
+If the `update` command target one of the natural identity properties of the component, the validation must iterate on siblings and check that none has the same values than the new candidate sibling for the identity properties of this type of component. If a duplicate would be created, an error 'CANNOT_CREATE_DUPLICATE' must be raised. When the targeted natural identity property is a multitext, it means to check the values qualified with the same languages on the other sibling components.
 
 ### 9.3 Clear
 
@@ -1516,7 +1532,7 @@ clear category
 ```
 
 If a scalar property doesn't exist (is not set) on the given component, the
-error is `PROPERTY_NOT_SET`.
+error is `UNSET_PROPERTY`.
 
 #### Clear for required scalar properties
 
@@ -1585,6 +1601,8 @@ set target =
 on relation[type = "associated-sense"]
 of entry[form@tww = "mami"]
 ```
+
+The LiftPatchRef DSL is not in charge of managing the integrity of the reference. It means that the LiftPatchRef DSL will not check, when a component is deleted, if it creates an invalid reference elsewhere. This is the responsability of the dictionary management system.
 
 2/ within selectors, the string value of the target ID can be used directly:
 
@@ -1890,7 +1908,7 @@ Example:
 1/ Create a sense with gloss "pig" (in default meta language) under the existing entry with form "mami" (in default object language):
 
 ```LiftPathShort
-c /e[f="mami"] s(gloss="pig") 
+c /e[f="mami"] s(g="pig") 
 ```
 
 2/ Delete an existing sense with gloss "pig" (in default meta language) under the existing entry  with form "mami" (in default object language):
@@ -1908,7 +1926,7 @@ u /e[f="mami"]/s[g="pig"] (c = "Verb")
 4/ Clear the property "category" of a sense:
 
 ```LiftPathShort
-c /e[f="mami"]/s[g="pig"] (c)
+l /e[f="mami"]/s[g="pig"] (c)
 ```
 
 5/ Set the property "category" of a sense:
@@ -1943,7 +1961,7 @@ Since the steps in the path are linked according to the semantics of `within`, t
 And with a `create` command, where the path select a sense and the initializers create an example under it:
 
 ```LiftPathShort
-create /e[f="mami"]/s[g="pig"] x(t="A mami jefi")
+c /e[f="mami"]/s[g="pig"] x(t="A mami jefi")
 ```
 
 translates into:
@@ -1951,20 +1969,20 @@ translates into:
 ```LiftPathRef
 create example(text="A mami jefi")
 under sense[gloss="pig"]
-within example[form="mami"]
+within entry[form="mami"]
 ```
 
 the ordinal pseudo-property in the reference syntax `[index=2]` is expressed with
 a single integer in the concise syntax:
 
 ```LiftPathShort
-/e[f="mami"]/s[g="pig"]/x[1]
+d /e[f="mami"]/s[g="pig"]/x[1]
 ```
 
 The preceding example is therefore equivalent to:
 
 ```LiftPathRef
-example[index = 1]
+delete example[index = 1]
   within sense[gloss@en = "pig"]
   within entry[form@tww = "mami"]
 ```
@@ -2312,8 +2330,15 @@ means:
   - create a new entry "mami" and create a new sense "pig" on it.
 
 ```
-u /"mami"/"pig"
+p /"mami"/"pig"
 ```
+
+Since, in this, entry form and sense gloss have no withespace or special character, it can be write:
+
+```
+p /mami/pig
+```
+
 
 ## A final example
 
