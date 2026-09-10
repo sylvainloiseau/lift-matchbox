@@ -192,7 +192,7 @@ The following table lists the properties. Each row gives a property name; the fo
     - Integer,
     - Reference (a string containing the ID of an entry or sense),
     - URL (a string containing an URL).
-  - Non scalar: multitext, which is a Map containing several strings associated to keys that are a lang code (more on this below, § "3.1. The multitext datatype")
+  - Non scalar: multitext, which is a Map containing several strings associated to keys that are a lang code (more on this below, section "4.2. The multitext datatype")
 - `Qualifier`: a multitext property value is qualified if a language name is also specified. A multitext property may contain several language-qualified values, but each language may occur at most once.
   - `O` — object language qualifier required or defaultable, for example `form@tww`.
   - `M` — meta language qualifier required or defaultable, for example `gloss@en`.
@@ -345,10 +345,11 @@ Square brackets always select existing objects. It never creates an object. Pare
 
 The selector may contain: 
 
-- for Entry and Sense: an ID  (see "5.2 IDs")
-- for all components, the identity property or the combination of two identity properties, depending on the component type (see "5.3 Identity properties" and "5.3.1")
-- For entry only: the qualified form + the has-gloss pseudo-predicate, as described in "5.4. Disambiguation of homophones".
-- for all components but entry: an index selector that selects the component relative to its position among similar-kind components under its parent (see "5.5. Ordinal selector")
+- for Entry and Sense: an ID  (see section "5.3.1 IDs")
+- for all components, the identity property or the combination of two identity properties, depending on the component type (see "5.2 Identity properties")
+- For entry only: the qualified form + the has-gloss pseudo-predicate, as described in section "5.3.2".
+- for all components but entry: an index selector that selects the component relative to its position among similar-kind components under its parent (see "5.3.3 Ordinal selector")
+- for selector under `within` only, the selector can contain any of this property without constraint (see section "7.3")
 
 It must contain only one of these four possible selector strategies. If several are given (for instance, an index and an ID, or an ID and the two identity properties), the validator MUST reject the selector with a 'DUPLICATE_SELECTOR' error.
 
@@ -376,7 +377,7 @@ A selector resolves to a set. The following rules are mandatory:
 As already stated in section "4.1", the natural identity property uniquely
 identify a component under its parent. It means that under a given parent, a
 a component can be uniquely identified and selected using the identity property
-or the combination of two identity properties listed in the table below. For
+or the combination of two identity properties listed in the table above in section "4.1". For
 instance, under a given entry, no two senses can have the same gloss value (for
 any meta language). Under different parents, however, two senses can have the
 same qualified gloss.
@@ -865,7 +866,7 @@ The language distinguishes the following cases:
 
 For all *property commands*, if the command refers to a property that does not exist on its parent type according to the table in section "4.", an error 'PROPERTY_NOT_FOUND' is raised.
 
-### Selecting direct parent with `under` or `on`
+### 7.1 Selecting direct parent with `under` or `on`
 
 For all eight commands, PARENT refers to the parent component of the targeted property or component. The parent is identified by either the `under` or the `on` keyword, then a mandatory component name, and then a mandatory `[SELECTOR]`.
 
@@ -873,7 +874,7 @@ For all eight commands, PARENT refers to the parent component of the targeted pr
   - there is no `under` clause when the target of the command is an entry, since an entry is at the root of the hierarchy and has no parent
 - `on` identifies the immediate parent of a property directly targeted by a property command (set, update, clear)
 
-### Selecting other ancestor with `of`
+### 7.2 Selecting other ancestor with `of`
 
 If the component selected by `under` or `on` is not an entry, `of` clause(s) must be used.
 
@@ -955,7 +956,7 @@ on sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
-### 7.1 Replacing `of` with `within` for existential filtering semantics
+### 7.3 Replacing `of` with `within` for existential filtering semantics
 
 While each `of` clause explicitly selects a component among its siblings, `within` allows for a existential filtering strategy. The logic is : *Keep parent P if ∃ child C in P such that C matches selector S.*
 
@@ -1214,7 +1215,7 @@ create sense(gloss@en = "pig")
 ```
 
 The duplicate detection works with the properties enumerated in the table in the
-section "5.3 identity properties". It means that, under the same parent, two
+section "5.2 identity properties". It means that, under the same parent, two
 senses are identical if they have the same qualified gloss; two examples are
 identical if they have the same qualified text, two variants are identical if
 they have the same type and target.
@@ -1290,7 +1291,7 @@ under entry[form@tww = "mami"]
 ```
 
 In order to resolve the identity of the component, the upsert command uses the
-identity properties mentioned in section "5.3 identity properties".
+identity properties mentioned in section "5.2 identity properties".
 
 Special rule with entry and sense:
 
