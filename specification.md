@@ -670,7 +670,7 @@ Another pseudo-property is `index`; its value is an integer, without quotes. It 
 - `index` can be used with any component type excepted `entry`.
 - The ordinal selector start at 1.
 - index cannot be mixed with any other property in a selector.
-- if the index value is < 0 or greater that the number of siblings, an INDEX_OUT_OF_BOUNDS exception is raised.
+- if the index value is < 1 or greater that the number of siblings, an INDEX_OUT_OF_BOUNDS exception is raised.
 
 An `index` cannot be set by any initializer. Therefore, they can used only in selection operations (as lookup predicates),  the move command, but not in a `create` command, not with an `ensure` command, and not with `upsert` command.
 
@@ -1105,9 +1105,9 @@ within sense[category="Noun"]
 within entry[form="mami"]
 ```
 
-- according to 1, the resolver starts with the last `within` clause: it selects all entries matching `entry[form="mami"]`. If no entry matches, it raises 'NOT_FOUND'. Suppose that four entries have this form.
-- according to 2, it then moves to the left of the `within` clause, which has a selector containing `sense[gloss="pig"]`. It applies this filter to the previously selected entries. Suppose that two entries have a sense child with a category "Noun" (on the same entry or not). Two candidate path remain.
-- according to 3, step 2 is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For the two senses selected at the end of the previous step, we look for an example with the given text. If one sense has this example, then the corresponding candidate paths rooted at an entry (the beginning of the `within` chain) is kept. If several senses have such an example, then an `AMBIGUOUS_REFERENCE` exception is raised. If no sense has such an example, then a `NOT_FOUND` is raised.
+- the resolver starts with the last `within` clause: it selects all entries matching `entry[form="mami"]`. If no entry matches, it raises 'NOT_FOUND'. Suppose that four entries have this form.
+- it then moves to the left of the `within` clause, which has a selector containing `sense[gloss="pig"]`. It applies this filter to the previously selected entries. Suppose that two entries have a sense child with a category "Noun" (on the same entry or not). Two candidate path remain.
+- step 2 is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For the two senses selected at the end of the previous step, we look for an example with the given text. If one sense has this example, then the corresponding candidate paths rooted at an entry (the beginning of the `within` chain) is kept. If several senses have such an example, then an `AMBIGUOUS_REFERENCE` exception is raised. If no sense has such an example, then a `NOT_FOUND` is raised.
 
 #### 7.3.4 Difference between `of` and `within`
 
@@ -1816,7 +1816,7 @@ and is followed by a whitespace character.
 language-default object = "tww"
 language-default meta = "en"
 language-create object = "tpi"
-language-create meta = "en"
+language-create meta = "fr"
 ```
 
 For reliable extraction from ordinary prose, commands MUST begin at the
@@ -2363,12 +2363,12 @@ For instance, in the following example, the creation construct "o(t="I shot a pi
 c /mami/pig x(t="a mami jefi", o(t="I shot a pig", y="literal"))
 ```
 
-Embedded initializers necessarily translate into block syntax with embedded `upsert`:
+Embedded initializers necessarily translate into block syntax with embedded `create`:
 
 ```
 sense[gloss="pig"] within entry[form="mami"] {
-  upsert example(text="a mami jefi") {
-    upsert translation(text="I shot a pig", type="literal") {
+  create example(text="a mami jefi") {
+    create translation(text="I shot a pig", type="literal") {
     }
   }
 }
@@ -2379,7 +2379,7 @@ Recall that two examples cannot have the same text under the same sense (example
 Embedded creation rules also include:
 
 - Embedded child creation is atomic with the parent command;
-- an embedded creation uses the semantics of `upsert`.
+- an embedded creation uses the semantics of `create`.
 
 ## 8. An idiosyncratic construct
 
