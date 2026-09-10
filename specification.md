@@ -354,7 +354,7 @@ Square brackets always select existing objects. It never creates an object. Pare
 
 We distinguish:
 
-- a *parent selector*: it is a selector in a `of`, `under`, `in` and `within` clause.
+- a *parent selector*: it is a selector in a `of`, `under`, `on` and `within` clause.
 - a *command selector*: it is the selector of the component directly targeted by a delete, ensure or move command.
 
 The selector may contain: 
@@ -706,7 +706,7 @@ The following table is normative.
 | Required non-identity property | required | required | required | allowed | forbidden | not allowed unless explicitly defined | allowed | allowed | only if another value remains |
 | Optional scalar property | forbidden | forbidden | allowed | allowed | forbidden | allowed only if declared identity | allowed | allowed if present | allowed |
 | Optional multitext property | forbidden | forbidden | one or more qualifiers | one or more qualifiers | forbidden | one qualifier only if identity | one qualifier | one qualifier | one qualifier or all qualifiers |
-| System-managed ID | allowed (for component where IDs are supported) alone | allowed (for component where IDs are supported) alone | forbidden | forbidden | forbidden | allowed (for component where IDs are supported), but in `within` | forbidden | forbidden | forbidden |
+| System-managed ID | allowed (for component where IDs are supported) alone | allowed (for component where IDs are supported) alone | forbidden | forbidden | forbidden | allowed (for component where IDs are supported); forbidden in `within` | forbidden | forbidden | forbidden |
 | `hn `| allowed only with `form` | allowed only with `form` | forbidden | allowed, but not use as initializer in the creation branch | forbidden | allowed only with `form` | not as a property target | not as a property target | forbidden |
 | `has-gloss` | allowed with `form` | allowed with `form` | forbidden | allowed, but not used as an initializer in the creation branch | forbidden | entry selector only, allowed with `form` | forbidden | forbidden | forbidden |
 | `index` | as sole selector only | as sole selector only | forbidden | forbidden | forbidden | as sole selector only | forbidden | forbidden | forbidden |
@@ -986,7 +986,7 @@ While each `of` clause explicitly selects a component among its siblings, `withi
 - with `of`, a component is selected if it satisfies its own selectors. As mentioned, the selector must contains all the identity properties so that the component is selected unambiguously.
 - with `within`, a component is selected if:
   - first, it belongs to one or more components selected (the selector at the right of `within` can contain any number of properties, identity property or not, that allows for several matches)
-  - secondly, only one of the component matched in the previous step has a matching child (as specified in selector at the left of the `within` selector).
+  - secondly, it matches the condition expressed in the selector at the left of the `within` selector).
   - For a chain `C0 within C1 ... within Cn`, construct the set of candidate paths `(c0, c1, ..., cn)` such that each `ci` matches its selector and each `ci` is a direct child of `c(i+1)`. This is an existential join over the chain, not independent selection of each component. The command succeeds only when exactly one complete candidate path remains; it raises `NOT_FOUND` when none remain and `AMBIGUOUS_REFERENCE` when two or more remain.
 - it is then allowed to use any property in a selector targeted by within, for instance the category property on sense, that is not an identity property
 - if the within chain result in one component, it succeed.
@@ -1310,13 +1310,12 @@ upsert sense(gloss@en = "pig")
   under entry[form@tww = "mami", hn=1]
 ```
 
-The logic of upsert is:
-- It creates the sense if no matching sense exists (it is the create branch) and resolves the existing
-  sense otherwise (the select branch).
-- A matching sense is a sense having the same values for its identity property or properties.
-- An upsert command fails with 'MISSING_IDENTITY_PROPERTY' if it does not have all the identity properties required for this component type as arguments (qualified text for an example, type + target for a variant, etc.).
+The logic of upsert in the preceding example is:
+- It creates the `sense` if no matching `sense` exists (it is the *create branch* of upsert) and resolves the existing sense otherwise (the *select branch*).
+- A matching `sense` is a `sense` having the same values for its identity property or properties.
+- An `upsert` command fails with 'MISSING_IDENTITY_PROPERTY' if it does not have all the identity properties required for this component type as arguments (qualified text for an example, type + target for a variant, etc.).
 - Once the component is created or selected with its identity properties, all the other properties will be
-  created or updated as needed (i.e. with the "set" semantics). In the following example, the category property
+  created or updated as needed (i.e. with the "set" semantics). In the following example, the `category` property
   will be either created (if it does not exist) or updated to "Noun" (if it does
   exist).
 
@@ -1331,10 +1330,14 @@ under entry[form@tww = "mami"]
 In order to resolve the identity of the component, the upsert command uses the
 identity properties mentioned in section "5.2 identity properties".
 
-Special rule with `entry` and `sense`:
+A special rule applies regarding ID with `entry` and `sense`:
 
 - with `entry` and `sense`: `upsert` cannot use an ID since an ID cannot be set. Using an ID with upsert fails with the error `ID_NOT_ALLOWED_ON_UPSERT`.
-- with `entry`, `upsert` can use either `hn` or `has-gloss`, both in conjunction with form, and those pseudo-property will be used only in the selection branch. If no entry match and that the create branch of upsert is executed, only `form`(and other non identity property) will be set and a new entry, possibly a homophone of an existing one, will be created, while `hn` or `has-gloss` will be ignored and not set.
+
+A special rule applies for `entry`.
+
+- with `entry`, `upsert` can use either `hn` or `has-gloss`, both in conjunction with `form`. This pseudo-property (`hn` or `has-gloss`) will be used only in the selection branch, when trying to select an existing entry. If no entry match and that the create branch of upsert is executed, only `form` (and optional other non identity property), but not `hn` or `has-gloss`, will be set and a new entry, possibly a homophone of an existing one, will be created, while `hn` or `has-gloss` will be ignored and not set.
+- upsert cannot be used on entry with only a `form`, and neither `hn` nor `has-gloss`. In that case, it would only create a new entry, potentially homophone -- this is what `create` already does.
 
 ### 8.3 The `ensure` command
 
@@ -1645,9 +1648,7 @@ variant[type="dialectal", target="pig-44"]
   type. `NO_SUCH_TARGET` is raised if the target cannot be resolved.
 - The validator verifies that the target is an entry or a sense. Otherwise,
   `INVALID_TARGET` is raised.
-- The validator verifies that the target is not the parent of the source
-  component itself.
-- The validator verifies that no two identical Relation or Variant components exist on the
+- The validator verifies that no two identical `Relation` or `Variant` components exist on the
   same parent component (i.e. with the same type and the same
   target). 
 
@@ -1720,7 +1721,7 @@ create entry(form@tww = "mami") {
 }
 ```
 
-Such situation should raise 'CANNOT_UPSERT_OR_ENSURE_IN_CREATION_BLOCK'.
+Such situation should raise 'CANNOT_UPSERT_ENSURE_OR_UPDATE_IN_CREATION_BLOCK'.
 
 
 Block semantics are:
@@ -2012,7 +2013,7 @@ The preceding example is therefore equivalent to:
 
 ```LiftPathRef
 delete example[index = 1]
-  within sense[gloss@en = "pig"]
+  under sense[gloss@en = "pig"]
   within entry[form@tww = "mami"]
 ```
 
@@ -2097,7 +2098,7 @@ m /e[f="mami"]/s[g="pig"] at index 1
 Translate in:
 
 ```LiftPathRef
-move sense[gloss="pig"] within entry[form="mami"] at index 1
+move sense[gloss="pig"] under entry[form="mami"] at index 1
 ```
 
 When `move` has a second path, it is equivalent to a move with an under clause in the reference syntax: it moves towards another parent.
@@ -2112,14 +2113,14 @@ is equivalent to:
 
 ```LiftPathRef
 move example[index = 1]
-  within sense[gloss@en = "pig"]
+  under sense[gloss@en = "pig"]
   within entry[form@tww = "mami"]
   under sense[gloss@en = "large_animal"]
   within entry[form@tww = "mami"]
   at end
 ```
 
-`beginning`, `end`, and `index n` have exactly the reference-language semantics,
+`beginning`, `end`, and `index <n>` have exactly the same semantics as in reference-syntax.
 
 ### 5.4 Set
 
