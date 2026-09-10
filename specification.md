@@ -3,14 +3,14 @@
 
 This document defines a command DSL, called *LiftPatch*, for creating, updating, deleting, upserting, and moving components and properties in a dictionary based on the LIFT data model.
 
-The Lift data model defines the structure of descriptive linguistics dictionary, made of entry, sense, example, trait, note, field, relation, etc.
+The Lift data model defines the structure of descriptive linguistics dictionary, made of `entry`, `sense`, `example`, `trait`, `note`, `field`, `relation`, etc.
 
 The *LiftPatch* language is not a serialization format: it is a mutation command language for updating the content. The language preserves the LIFT component hierarchy while making component identity, parentage, property availability, creation, selection, and mutation semantics explicit.
 
 A LIFT dictionary is a tree-like structure; it contains *components*, such as
-entry, sense, or example, which are nodes in the tree, and *properties* that
-are attached to the nodes and have datatypes such as the form of an entry, the
-gloss and the definition of a sense, etc.
+`entry`, `sense`, or `example`, which are nodes in the tree, and *properties* that
+are attached to the nodes and have datatypes such as the `form` of an `entry`, the
+`gloss` and the `definition` of a `sense`, etc.
 
 ## 1. Design principles
 
@@ -41,13 +41,20 @@ It is a verbose and explicit language.
 LiftPatch reference commands are contained in a script file, "Lift patch reference script". This file contains only:
 
 - commands that start on their own line with one of the eight verbs (set, upsert, update, clear, delete, ensure, create, move).
+- special instructions `language-default` and `language-create` 
 - comment: line starting with `#`
 
 2/ The second syntax, the *LiftPatch short language* (short: *LiftPatchShort*) is more concise.
 
 It is intended for lexicographers expressing lexical information to be ingested in a dictionary.
 
-The LiftPatchShort language is expressed on a single line. It can be mixed with other content and non-LiftPatchShort commands in a file. Only lines starting with one of the command verbs (or its single-letter abbreviation), followed by whitespace, are LiftPatchShort command lines.
+The LiftPatchShort commands are expressed on a single line. It can be mixed with other content and non-LiftPatchShort commands in a file.
+
+LiftPatchShort commands are:
+
+- lines starting with one of the command verbs (or its single-letter
+abbreviation) followed by whitespace (see the full description under Part 3)
+- special instructions `language-default` and `language-create` 
 
 ### Structure of this document
 
@@ -59,12 +66,12 @@ The LiftPatchShort language is expressed on a single line. It can be mixed with 
 
 ## 2 LIFT Dictionary
 
-A lift dictionary is an ordered list of Entry components.
+A lift dictionary is an ordered list of `entry` components.
 
 Since a lift dictionary is not a monolingual dictionary, it also has:
 
-- an ordered list of object languages, i.e. one or more languages that are described in the dictionary. These are, for instance, the languages represented in the entry or in the example. The list cannot be empty.
-- an ordered list of meta languages, i.e. one or more languages that are used to describe the object language. These are, for instance, the languages used in the gloss, the definition, or the translation of the example. The list cannot be empty.
+- an ordered list of object languages, i.e. one or more languages that are described in the dictionary. These are, for instance, the languages represented in the `entry` `form` or in the `example` `text`. The list cannot be empty.
+- an ordered list of meta languages, i.e. one or more languages that are used to describe the object language. These are, for instance, the languages used in the `gloss` and the `definition` properties of a `sense`, or the `translation` of the `example`. The list cannot be empty.
 
 ## 2.1. Default languages
 
@@ -123,7 +130,7 @@ language-create meta = "fr"
 
 ## 3. LIFT components
 
-A **component** is a structural LIFT node such as an entry, sense, or example. A component contains one or several properties.
+A **component** is a structural LIFT node such as an `entry`, `sense`, or `example`. A component contains one or several properties.
 
 | Component | LIFT-DSL name |
 |---|---|
@@ -145,7 +152,7 @@ A **component** is a structural LIFT node such as an entry, sense, or example. A
  
 This table is exhaustive.
 
-- An entry is a top-level component.
+- An `entry` is a top-level component.
 - Other components are non-top-level components.
 
 The allowed parent-child relationships are:
@@ -190,7 +197,7 @@ The following table lists the properties. Each row gives a property name; the fo
   - Scalar properties:
     - String,
     - Integer,
-    - Reference (a string containing the ID of an entry or sense),
+    - Reference (a string containing the ID of an `entry` or `sense`),
     - URL (a string containing an URL).
   - Non scalar: multitext, which is a Map containing several strings associated to keys that are a lang code (more on this below, section "4.2. The multitext datatype")
 - `Qualifier`: a multitext property value is qualified if a language name is also specified. A multitext property may contain several language-qualified values, but each language may occur at most once.
@@ -280,7 +287,7 @@ be rejected with an ILLEGAL_LANGUAGE error.
 - scalar property cardinality (i.e. string, reference, url): only one value for each scalar property may be present on a given component
 - Multitext property cardinality: one string per lang. 
   - There can be one sub-entry per lang value
-  - This means that the `form` property of an entry can have multiple
+  - This means that the `form` property of an `entry` can have multiple
     values for different languages, but cannot have multiple values for the same
     language.
   - Similarly, a sense cannot have multiple `glosses` for the same language, but
@@ -350,10 +357,10 @@ We distinguish:
 
 The selector may contain: 
 
-- for Entry and Sense: an ID  (see section "5.3.1 IDs")
+- for `entry` and `sense`: an ID  (see section "5.3.1 IDs")
 - for all components, the identity property or the combination of two identity properties, depending on the component type (see "5.2 Identity properties")
-- For entry only: the qualified form + the has-gloss pseudo-predicate, as described in section "5.3.2".
-- for all components but entry: an index selector that selects the component relative to its position among similar-kind components under its parent (see "5.3.3 Ordinal selector")
+- For `entry` only: the qualified form + the has-gloss pseudo-predicate, as described in section "5.3.2".
+- for all components but `entry`: an index selector that selects the component relative to its position among similar-kind components under its parent (see "5.3.3 Ordinal selector")
 - for selector under `within` only, the selector can contain any of this property without constraint (see section "7.3")
 
 It must contain only one of these four possible selector strategies. If several are given (for instance, an index and an ID, or an ID and the two identity properties), the validator MUST reject the selector with a 'DUPLICATE_SELECTOR' error.
@@ -383,7 +390,7 @@ As already stated in section "4.1", the natural identity property uniquely
 identify a component under its parent. It means that under a given parent, a
 a component can be uniquely identified and selected using the identity property
 or the combination of two identity properties listed in the table above in section "4.1". For
-instance, under a given entry, no two senses can have the same gloss value (for
+instance, under a given `entry`, no two `sense`s can have the same `gloss` value (for
 any meta language). Under different parents, however, two senses can have the
 same qualified gloss.
 
@@ -442,7 +449,7 @@ They are described in the following subsections.
 
 #### 5.3.1 IDs
 
-In a dictionary, entry and sense also have an `ID`. This ID is a persistent
+In a dictionary, `entry` and `sense` also have an `ID`. This `ID` is a persistent
 identity. The IDs are created automatically by the system, they can be referred
 to but not created manually, updated, upserted, deleted or cleared. They are
 globally unique, stable across moves, are not reused after deletion of a
@@ -465,24 +472,24 @@ Here is a normative summary of the ID rule:
 - The ID can be used as a lookup predicate with the `move` and `delete` command.
 
 
-#### 5.3.2 The case of entry: disambiguation of homophone entries with 'hn' and 'has-gloss'
+#### 5.3.2 The case of `entry`: disambiguation of homophone entries with 'hn' and 'has-gloss'
 
 Homophones are pervasive in language and therefore in dictionary entries. Since
 entries are not grouped in small sets under parents, but are all directly under
 the root, they are not easy to select.
 
-The 'form' property CAN be used alone in a selector for an entry, but if there are several matches (i.e. homophones), an error 'AMBIGUOUS_REFERENCE' will be raised. If there is only one match, the selector succeeds.
+The `form` property CAN be used alone in a selector for an `entry`, but if there are several matches (i.e. homophones), an error 'AMBIGUOUS_REFERENCE' will be raised. If there is only one match, the selector succeeds.
 
-For Entry, only the ID is a property that can uniquely identify an instance. However, IDs are arbitrary and not very human-readable. IDs CAN be used in a selector, but are not a satisfying solution from a practical point of view.
+For `entry`, only the ID is a property that can uniquely identify an instance. However, IDs are arbitrary and not very human-readable. IDs CAN be used in a selector, but are not a satisfying solution from a practical point of view.
 
 For practical purposes, two pseudo-properties are offered that can be expressed
 together with the 'form' property to disambiguate homophone entries and select
-uniquely an entry. Since these are an selecting mechanism, these two pseudo-properties:
+uniquely an `entry`. Since these are an selecting mechanism, these two pseudo-properties:
 - can be used only in selectors,
 - can be used in a upsert command (but are used only in the select branch, while they have no effect in its create branch),
 - in ensure command.
 
-They cannot be used with the `create` command. They are not natural identity properties, since they refer to the context outside of the entry itself.
+They cannot be used with the `create` command. They are not natural identity properties, since they refer to the context outside of the `entry` itself.
 
 ##### 5.3.2.1 The first pseudo-property is the homophone number (hn).
 
@@ -490,9 +497,9 @@ All homophonous entries share the same qualified form, but have a different
 homophone number ('hn').
 
 The homophone number ('hn') is not a natural identity property: on a given
-entry, it depends on the number of other entries with the same form, which is not
-a natural property of the entry itself. However, the form + the homophone number
-('hn') allows to uniquely select an entry in the dictionary at any given state of the dictionary: two entries can have
+`entry`, it depends on the number of other entries with the same form, which is not
+a natural property of the `entry` itself. However, the form + the homophone number
+('hn') allows to uniquely select an `entry` in the dictionary at any given state of the dictionary: two entries can have
 the same qualified form, but no two entries can have the same value for both
 the qualified form and the homophone number ('hn'). It is a contextual lookup key rather than an identity property.
 
@@ -500,7 +507,7 @@ The value of an hn pseudo-property is an Integer, without quotes.
 
 The homophone number ('hn') cannot be set by any initializer: they are managed internally by the dictionary.
 
-Using the 'hn' property with a create command or a create branch of an upsert command will result in an error 'ILLEGAL_USE_OF_HN'.
+Using the 'hn' property with a `create` command or a create branch of an `upsert` command will result in an error 'ILLEGAL_USE_OF_HN'.
 
 In a selector, 'hn' cannot be used alone, but always together with the form property:
 
@@ -511,15 +518,17 @@ of sense[gloss@en = "pig"]
 of entry[form@tww = "mami", hn = 1]
 ```
 
-If 'hn' is used alone, without the form property, an error 'HN_CANNOT_BE_USED_ALONE' will be raised.
+- if 'hn' is used alone, without the form property, an error 'HN_CANNOT_BE_USED_ALONE' will be raised.
+- if the `hn` value is not the hn value of any entry in the homophone set, an "HN_NOT_EXISTING" exception is raised.
+- hn start at 1. If the `hn` value is lesser than 1, an 'NEGATIVE_HN' is raised.
+- if a `hn` pseudo-property is mentioned on a selector but that the entry is not ambiguous (does not have homophone), an 'HN_WITHOUT_HOMOPHONE' exception is raised.
 
-- 'hn' are 1-indexed.
-- hn are automatically assigned by the dictionary
-- numbers are generated by entry creation order
-- if an hn value greater than the actual number of homophones in the homophone set is give, an "HN_OUT_OF_BOUND" exception is raised.
-- for a given entry with a given 'hn', the same 'hn' value is valid whatever qualified form is referred to, i.e. whatever the language.
-- 'hn' can be automatically reassigned by the dictionary, depending on the values of the form of the entry (set, cleared, updated).
-   - as long as no qualified form value is changed or added in an entry, the 'hn' value is guaranteed to remain the same.
+The reamining of this section is a list of technical information about the formal property of hn. Note that this information can be ignored for the DSL language implementation, since the exact algorithm of hn creation and management is not in the scope of this DSL, it is managed by the dictionary library. The DSL implementation use hn as a given property on `entry`.
+
+- numbers are generated by `entry` creation order, it means that, if no modification have been made to the form afterward, the order of hn reflect the chronological order of the creation of the `entry`.
+- for a given `entry` with a given 'hn', the same 'hn' value is valid whatever qualified `form` is referred to, i.e. whatever the object language for which this entry has a form sub-entry. Therefore, if an `entry` is refered with a qualified `form` and a `hn`, the same `entry` will be returned if another existing qualified `form` is referred to. For instance, if an `entry` has the two forms `form@tww="mami"` and `form@tpi="pik"`, and if there are another existing entry with `form@tww="mami"` and another entry with `form@tpi="pik"`, then the same hn (say, 3), will return the same first entry, should we use it with `form@tww="mami"` or with `form@tpi="pik"`.
+- 'hn' can be automatically reassigned by the dictionary, depending on the values of the form of the `entry` (`set`, `clear`ed, `update`d).
+   - as long as no qualified form value is changed or added in an `entry`, the 'hn' value is guaranteed to remain the same.
    - a change in the form of an entry can result in a different 'hn' value being assigned, and that new value will be used for subsequent lookups even with the qualified form property that were existing before the change.
 
 For instance, let's consider an entry with hn = 1 and form@tww = "mami" and form@tpi = "pik". The same 'hn' is valid with form@tww:
@@ -534,14 +543,16 @@ and for form form@tpi = "pik":
 entry[form@tpi = "pik", hn = 1]
 ```
 
-However, if the form@en = "pig" is added to the entry, and if it happens that
-there are already three homophones forms with form@en = "pig", then the hn value
-will be reassigned to 4 for this entry. `hn = 4` should now be used even with
-the lang `tww` and `tpi` in order to refer to this entry.
+However, if the value `form@en = "pig"` is added to the `entry`, and if it
+happens that there are already three homophones forms with form@en = "pig", then
+the hn value will be reassigned to 4 for this entry. `hn = 4` should now be used
+even with the lang `tww` and `tpi` in order to refer to this entry.
 
 In other word, if an entry as form in several languages, and that there at least
 one of its qualified forms that is in a homophone set, its homophone number is the size of the
 greatest homophone set + 1.
+
+In a homophone set in a given langage, `hn` are not guaranteed to be continguous.
 
 ##### 5.3.2.1 The `has-gloss` pseudo-predicate
 
@@ -1636,16 +1647,20 @@ the creation of a Variant, Relation, or Reversal component should fail with 'DUP
 
 Blocks provide convenient construct for related operations while preserving explicit component construction.
 
-A curly brace block is a syntactic construct that groups related commands together, and anchors them to a common parent
+A curly brace block is a syntactic construct that groups related commands together, and anchors them to a common parent.
+
 
 A block consists of
 - the *block header* which is given before the curly brace.
   - the block header is either:
     - a component with a selector
-    - a `create` or `upsert` command with a component and its selector 
+    - a `create` or `upsert` or `ensure` command with a component and its selector 
 - the *block body* which is given inside the curly brace. The block body contains either:
-  - another block: a block can be nested
+  - another block, with its header and body: block can be nested
   - one or several commands. Those commands have neither an `under` nor an `on` clause, since the parent is given by the block header.
+  - Note that an `upsert`, `ensure` or `update` cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related.
+
+The semantic of the relation between the block header and the command it contains is that of `under`: the block header is the parent of the component or property targeted by the inner commands.
 
 The next example has a block header that contains a component with selector. It will fail with 'AMBIGUOUS_REFERENCE' or 'NOT_FOUND' if the selector failed.
 
@@ -1664,10 +1679,10 @@ entry[form@tww = "mami"] {
 }
 ```
 
-In the next example, the outer block header is a upsert command:
+In the next example, the outer block header is a `upsert` command:
 
 ```LiftPathRef
-create entry(form@tww = "mami") {
+upsert entry(form@tww = "mami") {
   create sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
     set category = "Noun"
@@ -1676,9 +1691,9 @@ create entry(form@tww = "mami") {
 }
 ```
 
-An upsert, ensure or update cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related. For instance, in the following command, an upsert command is illegally in the scope of a `create` command at the direct upper level:
+As stated above, an `upsert`, `ensure` or `update` cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related. For instance, in the following command, an upsert command is illegally in the scope of a `create` command at the direct upper level -- expecting that a sense exist on a newly created entry make no sense --:
 
-```LiftPathRef
+```
 create entry(form@tww = "mami") {
   upsert sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
