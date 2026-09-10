@@ -706,7 +706,7 @@ The following table is normative.
 | Required non-identity property | required | required | required | allowed | forbidden | not allowed unless explicitly defined | allowed | allowed | only if another value remains |
 | Optional scalar property | forbidden | forbidden | allowed | allowed | forbidden | allowed only if declared identity | allowed | allowed if present | allowed |
 | Optional multitext property | forbidden | forbidden | one or more qualifiers | one or more qualifiers | forbidden | one qualifier only if identity | one qualifier | one qualifier | one qualifier or all qualifiers |
-| System-managed ID | allowed (for component where IDs are supported) alone | allowed (for component where IDs are supported) alone | forbidden | forbidden | forbidden | allowed (for component where IDs are supported) | forbidden | forbidden | forbidden |
+| System-managed ID | allowed (for component where IDs are supported) alone | allowed (for component where IDs are supported) alone | forbidden | forbidden | forbidden | allowed (for component where IDs are supported), but in `within` | forbidden | forbidden | forbidden |
 | `hn `| allowed only with `form` | allowed only with `form` | forbidden | allowed, but not use as initializer in the creation branch | forbidden | allowed only with `form` | not as a property target | not as a property target | forbidden |
 | `has-gloss` | allowed with `form` | allowed with `form` | forbidden | allowed, but not used as an initializer in the creation branch | forbidden | entry selector only, allowed with `form` | forbidden | forbidden | forbidden |
 | `index` | as sole selector only | as sole selector only | forbidden | forbidden | forbidden | as sole selector only | forbidden | forbidden | forbidden |
@@ -987,7 +987,7 @@ While each `of` clause explicitly selects a component among its siblings, `withi
 - with `within`, a component is selected if:
   - first, it belongs to one or more components selected (the selector at the right of `within` can contain any number of properties, identity property or not, that allows for several matches)
   - secondly, only one of the component matched in the previous step has a matching child (as specified in selector at the left of the `within` selector).
-  - if several `within` clause are chained, it is the existantial cartesian product of the condition that must result in one component
+  - For a chain `C0 within C1 ... within Cn`, construct the set of candidate paths `(c0, c1, ..., cn)` such that each `ci` matches its selector and each `ci` is a direct child of `c(i+1)`. This is an existential join over the chain, not independent selection of each component. The command succeeds only when exactly one complete candidate path remains; it raises `NOT_FOUND` when none remain and `AMBIGUOUS_REFERENCE` when two or more remain.
 - it is then allowed to use any property in a selector targeted by within, for instance the category property on sense, that is not an identity property
 - if the within chain result in one component, it succeed.
 - If several component match, then an `AMBIGUOUS_REFERENCE` error is raised.
@@ -998,13 +998,13 @@ For instance, the following example contains a chain of two within clause
 - First, entry matching the given form are select. Several entries can be selected, say Entry-A, Entry-B and Entry-C.
 - Then, only the entries having one (*or several*) sense with the given category are kept. If several sense match on a same entry, it create several candidate-tree:
   - Lets say that Entry-C has no sense with category="Verb" and is ruled out.
-  - Lets say that Entry-B has one sense with category="Verb" and is then kept. A candidate tree Entry-B.Sense-A is kept.
-  - Lets say that Entry-A has two senses with category="Verb". Two candidate trees are kept: Entry-A.Sense-B and Entry-A.Sense-C
-- There are now three candidate tree 
+  - Lets say that Entry-B has one sense with category="Verb" and is then kept. A candidate path Entry-B.Sense-A is kept.
+  - Lets say that Entry-A has two senses with category="Verb". Two candidate paths are kept: Entry-A.Sense-B and Entry-A.Sense-C
+- There are now three candidate path 
 - we considere now the left of the last `within`.
-  - If one candidate tree has an example with the required property, it succeed and this example is the parent of the created note.
-  - If several candidate trees have an example with the required property, the within chain failled with `AMBIGUOUS_REFERENCE`
-  - If no candidate tree has an example with the required property, the within chain failled with `NOT_FOUND`.
+  - If one candidate path has an example with the required property, it succeed and this example is the parent of the created note.
+  - If several candidate paths have an example with the required property, the within chain failled with `AMBIGUOUS_REFERENCE`
+  - If no candidate path has an example with the required property, the within chain failled with `NOT_FOUND`.
 
 ```LiftPathRef
 create note(
@@ -1098,7 +1098,7 @@ Here is an example. Let's focus on the following example.
 
 ```LiftPathRef
 update value = "Animals"
-under trait(type="semantic domain")
+on trait(type="semantic domain")
 of translation(type="free")
 of example[text="a mami jefi"]
 within sense[gloss="pig"]
@@ -1731,9 +1731,8 @@ Block semantics are:
 4. Make preceding changes visible to subsequent commands in the same block.
 5. Roll back the entire block if any child command fails.
 
-Inside a component block, a property command that omits `under` uses the current
-block component as its parent. An explicit `under` clause overrides this
-implicit parent. Outside a block, `under` is mandatory for property commands.
+Inside a component block, a property command omits `on` and uses the current
+block component as its parent. Outside a block, `on` is mandatory for property commands.
 
 Blocks are not loops, conditionals, or variables. They only provide lexical
 nesting and an atomic transaction boundary.
@@ -1752,7 +1751,7 @@ This surface syntax is line-oriented: a command is on a single line.
 
 It is intended for lexicographers who frequently create entries, senses, examples, and their properties in a text document containing both commands and ordinary prose. The parser must then distinguish LiftPatchShort concise command line from ordinary prose paragraphs.
 
-Every valid surface command MUST have an unambiguous expansion into one reference-language command. All the semantic principles of the reference syntax MUST be followed. The difference between LIFT-DSL and LIFT-Short-DSL are surface syntax differences only.
+Every valid surface command MUST have an unambiguous expansion into one or several reference-language command. All the semantic principles of the reference syntax MUST be followed. The difference between LIFT-DSL and LIFT-Short-DSL are surface syntax differences only.
 
 Every unspecified rule or semantic constraint in this concise language specification is inherited from the reference syntax specification. For instance
 - required properties on initializers
@@ -1944,7 +1943,7 @@ c /e[f="mami"] s(g="pig")
 2/ Delete an existing sense with gloss "pig" (in default meta language) under the existing entry  with form "mami" (in default object language):
 
 ```LiftPathShort
-d /e[f="mami"] s[g="pig"]
+d /e[f="mami"]/s[g="pig"]
 ```
 
 3/ Update the property "category" of a sense:
@@ -2063,7 +2062,7 @@ The `delete` command deletes the last step of the path.
 This command:
 
 ```LiftPathShort
-d /e[f="mami"] s[g="pig"]
+d /e[f="mami"]/s[g="pig"]
 ```
 
 This translate into:
@@ -2076,7 +2075,7 @@ delete sense[gloss="pig"] under
 This command:
 
 ```LiftPathShort
-d /e[f="mami"]/s[g="pig"] x[t="a mami jefi"]
+d /e[f="mami"]/s[g="pig"]/x[t="a mami jefi"]
 ```
 
 This translate into:
@@ -2372,7 +2371,7 @@ p /mami/pig
 It is equivalent to:
 
 ```LiftPatchRef
-upsert entry([form="mami", has-gloss="pig"]) {
+upsert entry(form="mami", has-gloss="pig") {
   upsert sense(gloss="pig")
 }
 ```
