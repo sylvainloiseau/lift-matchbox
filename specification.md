@@ -411,7 +411,7 @@ this language is the same as the value given in the lookup predicate ('pig' in
 the following example), it will not take into account the fact that other
 sub-entries for other languages exist or not.
 
-```text
+```LiftPathRef
 set field^review@en = "My field"
 on example[index = 1]
 of sense[gloss@en = "pig"]
@@ -495,7 +495,7 @@ Using the 'hn' property with a create command or a create branch of an upsert co
 
 In a selector, 'hn' cannot be used alone, but always together with the form property:
 
-```text
+```LiftPathRef
 set field^review@en = "My field"
 on example[index = 1]
 of sense[gloss@en = "pig"]
@@ -579,7 +579,7 @@ entry is intended. Therefore the following command must fail if several entries
 have `form@tww = "mami"`, even if there is only one entry with `form@tww =
 "mami"` and that have a sense with `gloss@en = "door"`:
 
-```text
+```LiftPathRef
 
 create example(
   text@tww = "a mami jefi",
@@ -601,7 +601,7 @@ AMBIGUOUS_REFERENCE
 
 Instead, `has-gloss` could be used in such a case to disambiguate:
 
-```text
+```LiftPathRef
 create example(
   text@tww = "a mami jefi",
   translation@en = "I shot a pig"
@@ -617,7 +617,7 @@ of entry[
 
 Another option could be to use `within`, as described in section "7.1" below:
 
-```text
+```LiftPathRef
 create example(
   text@tww = "a mami jefi",
   translation@en = "I shot a pig"
@@ -648,7 +648,7 @@ It is an order-dependent selector, depending on the order of the node amongst it
 
 In the following example, the second sense in the sense list is selected:
 
-```text
+```LiftPathRef
 create example(
   text@tww = "a mami jefi",
   translation@en = "I shot a pig"
@@ -765,7 +765,7 @@ Multiple property initializers, separated by commas, are allowed (note that the
 following example must fail if several homophones entries have the form "mami"
 for the lang "tww"):
 
-```text
+```LiftPathRef
 create example(
   text@tww = "a mami jefi",
   text@tpi = "mi shutim pik"
@@ -887,44 +887,44 @@ Here are some examples:
 
 - creating an entry makes no reference to a parent:
 
-```text
+```LiftPathRef
 create entry(form@tww = "mami")
 ```
 
 Create a sense under an existing entry:
 
-```text
+```LiftPathRef
 create sense(gloss@en = "pig")
   under entry[form@tww = "mami"]
 ```
 
-```text
+```LiftPathRef
 set definition@en =
   "A four-legged terrestrial animal"
 on sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
-```text
+```LiftPathRef
 update definition@en =
   "A revised four-legged terrestrial animal"
 on sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
-```text
+```LiftPathRef
 update form@tww = "memi"
   on entry[form@tww = "mami"]
 ```
 
-```text
+```LiftPathRef
 delete sense[gloss@en = "pig"]
   under entry[form@tww = "mami"]
 ```
 
 `set` creates or replaces the selected property:
 
-```text
+```LiftPathRef
 set definition@en =
   "A definition"
 on sense[gloss@en = "pig"]
@@ -933,7 +933,7 @@ of entry[form@tww = "mami"]
 
 An empty string is a valid property value. It does not mean deletion:
 
-```text
+```LiftPathRef
 set category = ""
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -941,7 +941,7 @@ set category = ""
 
 To remove a property, use `clear`:
 
-```text
+```LiftPathRef
 clear category
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -949,7 +949,7 @@ clear category
 
 The following strict update requires the property to exist:
 
-```text
+```LiftPathRef
 update definition@en =
   "A revised definition"
 on sense[gloss@en = "pig"]
@@ -968,7 +968,7 @@ For instance, in the following example, the sense is after a `within` clause.
 - several senses can then be matched
 - if only one of those has a child that matches the component to the left of the `within` clause, i.e. an example that has the text "a mami jefi", then the `within` succeeds. If several senses have a matching child, then an `AMBIGUOUS_REFERENCE` error is raised. If no sense satisfies its selector, or if no sense has a matching child, then a `NOT_FOUND` is raised.
 
-```text
+```LiftPathRef
 create note(
   type = "special",
   text@en = "Very important"
@@ -1017,7 +1017,7 @@ within NEXT_PARENT
 
 For example:
 
-```text
+```LiftPathRef
 create note(
   type = "special",
   text@en = "Very important"
@@ -1056,16 +1056,18 @@ With a `within` clause chain, the selection follows the following algorithm:
 3. Step 2 is repeated with the other `within` clauses in the clause chain (in reverse declaration order): the validator considers the selector at the left of the previous clause, and it must applied it to the child found during the previous step. When these parents do not have the corresponding child, the corresponding subtree rooted at the beginning of the `within` clause chain is filtered out.
 4. When the last `within` clause is executed, exactly one subtree must be left. If, at the end, more than one subtree remains, an 'AMBIGUOUS_REFERENCE' is raised.
 
-Here is an example. Let's focus on this construction
+Here is an example. Let's focus on the following example.
 
-```text
-COMMAND
-under trait(value="semantic domain")
+```LiftPathRef
+update value = "Animals"
+under trait(type="semantic domain")
 of translation(text="I shoot a pig")
 of example[text="a mami jefi"]
 within sense[gloss="pig"]
 within entry[form="mami"]
 ```
+
+In the previous example:
 
 - The resolver starts with the last `within` chain, which contains:
 
@@ -1083,7 +1085,7 @@ within entry[form="mami"]
 
 An `of` clause identifies the immediate parent of the preceding component in a chain where each step is uniquely and unambiguously selected.
 
-```text
+```LiftPathRef
 set definition@en = "A definition"
 on sense[gloss@en = "foo"]
 of entry[form@tww = "mami"]
@@ -1091,7 +1093,7 @@ of entry[form@tww = "mami"]
 
 A `within` clause describes a chain of parent-child relations with potentially partial information (not sufficient to uniquely select the node) on each step, the resolver being in charge of finding a complete chain that satisfies all the constraints:
 
-```text
+```LiftPathRef
 set definition@en = "A definition"
 on example[index = 1]
 of sense[category = "Noun"]
@@ -1105,7 +1107,7 @@ When a `within` clause is used, the parent selector is evaluated together with t
 
 For example:
 
-```text
+```LiftPathRef
 create example(
   text@tww = "a mami jefi"
 )
@@ -1147,7 +1149,7 @@ A `within` clause is always a selector constraint. It never creates an ancestor 
 
 For example:
 
-```text
+```LiftPathRef
 create note(type = "special", text@en = "Very important")
 under sense[gloss@en = "foo"]
 within entry[form@tww = "mami"]
@@ -1169,11 +1171,9 @@ entry[form = "mami"] containing sense[gloss = "foo"]
 
 expressible without silently using a child selector to disambiguate an ambiguous entry.
 
-I recommend these design decisions:
-
 1. Use `of` for an explicit, immediate parent chain.
 2. Use `within` for a parent constraint.
-3. Define `within` as an existential child constraint: the parent must contain at least one matching descendant.
+3. `within` is an existential child constraint: the parent must contain at least one matching descendant.
 4. Resolve the complete constrained path before executing the command.
 5. Never let `within` create missing ancestors.
 6. Multiple matching `within` chains produce `AMBIGUOUS_REFERENCE`.
@@ -1189,18 +1189,18 @@ Properties required for the creation of a component are defined in the "Required
 
 Here are examples of `create` commands that create new components:
 
-```text
+```LiftPathRef
 create note(type = "sociolinguistics", text@en = "A sociolinguistic note")
   under entry[form@tww = "mami"]
 ```
 
-```text
+```LiftPathRef
 create field(type = "borrowing", text@en = "yes")
   [gloss@en = "pig"]
   of entry[form@tpi = "pik"]
 ```
 
-```text
+```LiftPathRef
 create trait(type = "CVpattern", value = "CVC")
   under entry[form@tpi = "pik"]
 ```
@@ -1234,7 +1234,7 @@ upsert sense(
 For entry, a component with the same value for the `form` property may exist; the following should
 work, even if an entry already exists with the same qualified form:
 
-```text
+```LiftPathRef
 create entry(form@tww = "mami")
 ```
 
@@ -1254,7 +1254,7 @@ at index <n>
 
 Example:
 
-```text
+```LiftPathRef
 create sense(gloss@en = "pig")
   under entry[form@tww = "mami"]
   at beginning
@@ -1267,7 +1267,7 @@ create sense(gloss@en = "pig")
 
 `upsert` select a component or create it if it does not exist:
 
-```text
+```LiftPathRef
 upsert sense(gloss@en = "pig")
   under entry[form@tww = "mami", hn="1"]
 ```
@@ -1320,14 +1320,14 @@ under entry[form@tww = "mami"]
 Deleting a component also deletes its descendants. For instance, the following
 command will delete the sense as well as all the component descendants:
 
-```text
+```LiftPathRef
 delete sense[gloss@en = "pig"]
   under entry[form@tww = "mami"]
 ```
 
 Deleting an entry requires no parent clause:
 
-```text
+```LiftPathRef
 delete entry[form@tww = "mami"]
 ```
 
@@ -1347,7 +1347,7 @@ at index <n>
 
 1/ When the move command has no under clause, the destination is the same parent: the component is moved in its set of siblings.
 
-```text
+```LiftPathRef
 move example[index = 1]
   of sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -1356,16 +1356,16 @@ move example[index = 1]
 
 When moving within the same parent, the index corresponds to a position after the moved component has been removed. The following moves the second element to the third position:
   
-```text
+```LiftPathRef
 move example[index = 2]
   of sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
   at index 3
 ```
 
-2/ When the move command has an under clause, the destination is the component targeted by the under clause:
+2/ When the move command has an `under` clause, the destination is the component targeted by the `under` clause:
 
-```text
+```LiftPathRef
 move example[index = 1]
   of sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -1401,7 +1401,7 @@ Moving changes position and parentage, never identity.
 `set` is the normal property assignment operation. It creates the target if
 absent and replaces its value if present:
 
-```text
+```LiftPathRef
 set category = "Noun"
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -1409,7 +1409,7 @@ set category = "Noun"
 
 Or:
 
-```text
+```LiftPathRef
 set text@en =
   "A sociolinguistic note"
 on note(type = "sociolinguistic")
@@ -1429,7 +1429,7 @@ For instance, the following `set` operation will assign a value in the current
 default language (say, "en"), it will not assign the definition to a generic,
 not language-specific definition:
 
-```text
+```LiftPathRef
 set definition = "A definition"
 on sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
@@ -1443,7 +1443,7 @@ it will not change any other qualified value existing on that property (say,
 
 Update requires an existing target:
 
-```text
+```LiftPathRef
 update definition@en =
   "A four-legged animal"
   on sense[gloss@en = "pig"]
@@ -1452,7 +1452,7 @@ update definition@en =
 
 or:
 
-```text
+```LiftPathRef
 update text@en = "A revised note"
 on note(type="review")
 of sense[gloss@en = "pig"]
@@ -1466,7 +1466,7 @@ implicit.
 
 In the following example, the default language is used in order to qualify the definition property:
 
-```text
+```LiftPathRef
 update definition =
   "A four-legged animal"
   on sense[gloss@en = "pig"]
@@ -1479,7 +1479,7 @@ update definition =
 
 `clear` removes property values while retaining the parent component:
 
-```text
+```LiftPathRef
 clear definition@en
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -1487,7 +1487,7 @@ clear definition@en
 
 For a multitext property, omitting the language removes all language values:
 
-```text
+```LiftPathRef
 clear definition
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -1509,7 +1509,7 @@ clear url
 on illustration[...]
 ```
 
-```text
+```LiftPathRef
 clear category
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -1570,7 +1570,7 @@ Properties of datatype "reference" store the ID of the referenced component.
 
 1/ Within command, the value is set by referring to the target component, with selector:
 
-```text
+```LiftPathRef
 set target = entry[form@tww = "memi"]
 on relation[type = "synonym"]
 of entry[form@tww = "mami"]
@@ -1578,7 +1578,7 @@ of entry[form@tww = "mami"]
 
 A relation to a sense may be written:
 
-```text
+```LiftPathRef
 set target =
   sense[gloss@en = "pig"]
   of entry[form@tww = "memi"]
@@ -1629,7 +1629,7 @@ A block consists of
 
 The next example has a block header that contains a component with selector. It will fail with 'AMBIGUOUS_REFERENCE' or 'NOT_FOUND' if the selector failed.
 
-```text
+```LiftPathRef
 entry[form@tww = "mami"] {
   create sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
@@ -1646,7 +1646,7 @@ entry[form@tww = "mami"] {
 
 In the next example, the outer block header is a upsert command:
 
-```text
+```LiftPathRef
 create entry(form@tww = "mami") {
   create sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
@@ -1658,7 +1658,7 @@ create entry(form@tww = "mami") {
 
 An upsert, ensure or update cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related. For instance, in the following command, an upsert command is illegally in the scope of a `create` command at the direct upper level:
 
-```text
+```LiftPathRef
 create entry(form@tww = "mami") {
   upsert sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
@@ -1889,31 +1889,31 @@ Example:
 
 1/ Create a sense with gloss "pig" (in default meta language) under the existing entry with form "mami" (in default object language):
 
-```text
+```LiftPathShort
 c /e[f="mami"] s(gloss="pig") 
 ```
 
 2/ Delete an existing sense with gloss "pig" (in default meta language) under the existing entry  with form "mami" (in default object language):
 
-```text
+```LiftPathShort
 d /e[f="mami"] s[g="pig"]
 ```
 
 3/ Update the property "category" of a sense:
 
-```text
+```LiftPathShort
 u /e[f="mami"]/s[g="pig"] (c = "Verb")
 ```
 
 4/ Clear the property "category" of a sense:
 
-```text
+```LiftPathShort
 c /e[f="mami"]/s[g="pig"] (c)
 ```
 
 5/ Set the property "category" of a sense:
 
-```text
+```LiftPathShort
 s /e[f="mami"]/s[g="pig"] (c = "Noun")
 ```
 
@@ -1977,7 +1977,7 @@ As with the reference syntax, the index selector cannot occur together with any 
 
 Commands with initializer are identical to the initializer + `under` in the reference language.
 
-```text
+```LiftPathShort
 c /e[f="mami"] s(g="pig")
 ```
 
@@ -1996,7 +1996,7 @@ As in the reference language:
 - upsert (p) requires all identity properties
 - The initializer initializes the property or properties that are required for the creation of a component in the reference syntax. If two properties are required, they are separated by a comma:
 
-```text
+```LiftPathShort
 c /e[f="mami"]/s[g="pig"] n(y="sociolinguistics", t="my note")
 ```
 
@@ -2014,26 +2014,26 @@ The `delete` command deletes the last step of the path.
 
 This command:
 
-```text
+```LiftPathShort
 d /e[f="mami"] s[g="pig"]
 ```
 
 This translate into:
 
-```text
+```LiftPathRef
 delete sense[gloss="pig"] under
   entry[form="mami"]
 ```
 
 This command:
 
-```text
+```LiftPathShort
 d /e[f="mami"]/s[g="pig"] x[t="a mami jefi"]
 ```
 
 This translate into:
 
-```text
+```LiftPathRef
 delete example[text="a mami jefi"]
   under sense[gloss="pig"]
   within entry[form="mami"]
@@ -2043,13 +2043,13 @@ As stated earlier, the steps in the path are linked according to the semantics o
 
 ### Move
 
-```text
+```LiftPathShort
 m /e[f="mami"]/s[g="pig"] at index 1
 ```
 
 Translate in:
 
-```text
+```LiftPathRef
 move sense[gloss="pig"] within entry[form="mami"] at index 1
 ```
 
@@ -2057,13 +2057,13 @@ When `move` has a second path, it is equivalent to a move with an under clause i
 
 Then, the following: 
 
-```text
+```LiftPathShort
 m /e[f="mami"]/s[g="pig"]/x[1] /e[f="mami"]/s[g="large animal"] at end
 ```
 
 is equivalent to:
 
-```text
+```LiftPathRef
 move example[index = 1]
   within sense[gloss@en = "pig"]
   within entry[form@tww = "mami"]
@@ -2076,13 +2076,13 @@ move example[index = 1]
 
 ### Set
 
-```text
+```LiftPathShort
 s /e[f="mami"]/s[g="pig"] (c = "Noun")
 ```
 
 Is equivalent to:
 
-```text
+```LiftPathRef
 set category = "Noun" 
   on sense[gloss="pig"]
   within entry[form="mami"]
@@ -2090,13 +2090,13 @@ set category = "Noun"
 
 ### Update
 
-```text
+```LiftPathShort
 u /e[f="mami"]/s[g="pig"] (c = "Verb")
 ```
 
 is equivalent to
 
-```text
+```LiftPathRef
 update category = "Verb" 
   on sense[gloss="pig"]
   within entry[form="mami"]
@@ -2104,13 +2104,13 @@ update category = "Verb"
 
 ### Clear
 
-```text
+```LiftPathShort
 l /e[f="mami"]/s[g="pig"] (c)
 ```
 
 is equivalent to
 
-```text
+```LiftPathRef
 clear category
   on sense[gloss="pig"]
   within entry[form="mami"]
