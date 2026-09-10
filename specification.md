@@ -411,9 +411,9 @@ between square bracket, when a multitext identity property is mentioned, only
 Therefore, the following example will be rejected with 'DUPLICATE_SELECTOR' because the sense is selected by two qualified values:
 
 ```text
-set field^review@en =
-  "My field"
-on example[index = 1]
+set text = "My field"
+on field[type="review"]
+of example[index = 1]
 of sense[gloss@en = "pig", gloss@fr = "porc"]
 of entry[form@tww = "mami"]
 ```
@@ -426,8 +426,9 @@ the following example), it will not take into account the fact that other
 sub-entries for other languages exist or not.
 
 ```LiftPathRef
-set field^review@en = "My field"
-on example[index = 1]
+set text = "My field"
+on field[type="review"]
+of example[index = 1]
 of sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
@@ -455,7 +456,7 @@ In a dictionary, `entry` and `sense` also have an `ID`. This `ID` is a persisten
 identity. The IDs are created automatically by the system, they can be referred
 to but not created manually, updated, upserted, deleted or cleared. They are
 globally unique, stable across moves, are not reused after deletion of a
-component. It can be used as a lookup predicates on selector, but on a component targeted by `within`.
+component. It can be used as a lookup predicates on selector, excepted on a component targeted by `within`.
 
 Example:
 
@@ -470,7 +471,7 @@ present after initialization.
 Here is a normative summary of the ID rule:
 
 - The ID cannot be set, deleted, initialized during creation, or cleared.
-- The ID can be used as a lookup predicate on parent selector (in `of`, `under`, `on` and `within` clause)
+- The ID can be used as a lookup predicate on parent selector (in `of`, `under`, `on`, excepted in `within` clause where it is forbidden)
 - The ID can be used as a lookup predicate with the `move` and `delete` command.
 
 
@@ -485,11 +486,11 @@ The `form` property CAN be used alone in a selector for an `entry`, but if there
 For `entry`, only the ID is a property that can uniquely identify an instance. However, IDs are arbitrary and not very human-readable. IDs CAN be used in a selector, but are not a satisfying solution from a practical point of view.
 
 For practical purposes, two pseudo-properties are offered that can be expressed
-together with the 'form' property to disambiguate homophone entries and select
+together with the `form` property to disambiguate homophone entries and select
 uniquely an `entry`. Since these are an selecting mechanism, these two pseudo-properties:
-- can be used only in selectors,
-- can be used in a upsert command (but are used only in the select branch, while they have no effect in its create branch),
-- in ensure command.
+- can be used only in parent selectors (selector with `under`, `of`, `on`, but not with `within`)
+- can be used in a `upsert` command (but are used only in the select branch, while they have no effect in its create branch),
+- cannot be used in `ensure` command.
 
 They cannot be used with the `create` command. They are not natural identity properties, since they refer to the context outside of the `entry` itself.
 
@@ -516,8 +517,9 @@ The value of an hn pseudo-property is an Integer, without quotes.
 In a selector, 'hn' cannot be used alone, but always together with the form property:
 
 ```LiftPathRef
-set field^review@en = "My field"
-on example[index = 1]
+set text@en = "My field"
+on field[type="review"]
+of example[index = 1]
 of sense[gloss@en = "pig"]
 of entry[form@tww = "mami", hn = 1]
 ```
@@ -699,7 +701,7 @@ In order to change an index, use the move command.
 
 The following table is normative.
 
-| Property kind | `delete` | `move` | `create` | `upsert` | `ensure` | on parent selector (in `under`, `on`, `within` clause)| `set` | `update` | `clear` |
+| Property kind | `delete` | `move` | `create` | `upsert` | `ensure` | on parent selector (in `under`, `on`, `within` clause) | `set` | `update` | `clear` |
 |---|---|---|---|---|---|---|---|---|---|
 | Required identity property | required | required | required | required | required | allowed | allowed, subject to uniqueness | allowed, subject to uniqueness | only if the component remains valid |
 | Optional natural property | allowed | allowed | allowed | allowed; uses set semantics | forbidden | allowed only if part of identity | allowed | allowed if present | allowed |
@@ -707,8 +709,8 @@ The following table is normative.
 | Optional scalar property | forbidden | forbidden | allowed | allowed | forbidden | allowed only if declared identity | allowed | allowed if present | allowed |
 | Optional multitext property | forbidden | forbidden | one or more qualifiers | one or more qualifiers | forbidden | one qualifier only if identity | one qualifier | one qualifier | one qualifier or all qualifiers |
 | System-managed ID | allowed (for component where IDs are supported) alone | allowed (for component where IDs are supported) alone | forbidden | forbidden | forbidden | allowed (for component where IDs are supported); forbidden in `within` | forbidden | forbidden | forbidden |
-| `hn `| allowed only with `form` | allowed only with `form` | forbidden | allowed, but not use as initializer in the creation branch | forbidden | allowed only with `form` | not as a property target | not as a property target | forbidden |
-| `has-gloss` | allowed with `form` | allowed with `form` | forbidden | allowed, but not used as an initializer in the creation branch | forbidden | entry selector only, allowed with `form` | forbidden | forbidden | forbidden |
+| `hn `| allowed only with `form` | allowed only with `form` | forbidden | allowed, but used only in the selector branch, and not used as initializer in the creation branch | forbidden | entry selector only, with `form`; forbidden with `within` | not as a property target | not as a property target | forbidden |
+| `has-gloss` | allowed with `form` | allowed with `form` | forbidden | allowed, but used only in the selector branch, not used as an initializer in the creation branch | forbidden | entry selector only, with `form`; forbidden in `within` | forbidden | forbidden | forbidden |
 | `index` | as sole selector only | as sole selector only | forbidden | forbidden | forbidden | as sole selector only | forbidden | forbidden | forbidden |
 
 Here `allowed` does not mean that every property is valid on every component. Availability is first determined by the property availability table.
@@ -855,8 +857,8 @@ upsert COMPONENT(initializers) under PARENT
 delete entry[SELECTOR]
 delete COMPONENT[SELECTOR] under PARENT
 
-move COMPONENT[SELECTOR] under COMPONENT[SELECTOR] at POSITION
-move COMPONENT[SELECTOR] at POSITION
+move COMPONENT[SELECTOR] under SOURCE-PARENT under DESTINATION-PARENT at POSITION
+move COMPONENT[SELECTOR] under PARENT at POSITION
 
 ensure COMPONENT(initializers) under PARENT
 ```
@@ -1098,8 +1100,8 @@ Here is an example. Let's focus on the following example.
 
 ```LiftPathRef
 update value = "Animals"
-on trait(type="semantic domain")
-of translation(type="free")
+on trait[type="semantic domain"]
+of translation[type="free"]
 of example[text="a mami jefi"]
 within sense[gloss="pig"]
 within entry[form="mami"]
@@ -1388,11 +1390,11 @@ at index <n>
 
 - The index is 1-based. 
 
-1/ When the move command has no under clause, the destination is the same parent: the component is moved in its set of siblings.
+1/ When the move command has only one `under` clause, the destination is the same parent: the component is moved in its set of siblings.
 
 ```LiftPathRef
 move example[index = 1]
-  of sense[gloss@en = "pig"]
+  under sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
   at end
 ```
@@ -1401,16 +1403,16 @@ When moving within the same parent, the index corresponds to a position after th
   
 ```LiftPathRef
 move example[index = 2]
-  of sense[gloss@en = "pig"]
+  under sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
   at index 3
 ```
 
-2/ When the move command has an `under` clause, the destination is the component targeted by the `under` clause:
+2/ When the move command has an second `under` clause, the destination is the component targeted by this second `under` clause:
 
 ```LiftPathRef
 move example[index = 1]
-  of sense[gloss@en = "pig"]
+  under sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
   under sense[gloss@en = "large_animal"]
   of entry[form@tww = "mami"]
@@ -1456,7 +1458,7 @@ Or:
 ```LiftPathRef
 set text@en =
   "A sociolinguistic note"
-on note(type = "sociolinguistic")
+on note[type = "sociolinguistic"]
 of sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
@@ -1500,7 +1502,7 @@ or:
 
 ```LiftPathRef
 update text@en = "A revised note"
-on note(type="review")
+on note[type="review"]
 of sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
@@ -1697,11 +1699,38 @@ entry[form@tww = "mami"] {
 }
 ```
 
+The header can be a parent selector chain, with `of`:
+
+```LiftPathRef
+sense[gloss="pig"]
+of entry[form@tww = "mami"] {
+    create example(text@tww = "a mami jefi") {
+      create translation(
+          type="free",
+          text@en = "I shot a pig")
+    }
+}
+```
+
+as well as with `within`:
+
+```LiftPathRef
+sense[gloss="pig"]
+within entry[form@tww = "mami"] {
+    create example(text@tww = "a mami jefi") {
+      create translation(
+          type="free",
+          text@en = "I shot a pig")
+    }
+}
+```
+
+
 In the next example, the outer block header is a `upsert` command:
 
 ```LiftPathRef
-upsert entry(form@tww = "mami") {
-  create sense(gloss@en = "pig") {
+upsert entry(form@tww = "mami", has-gloss="pig") {
+  upsert sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
     set category = "Noun"
     create example(text@tww = "a mami jefi") 
@@ -1709,7 +1738,12 @@ upsert entry(form@tww = "mami") {
 }
 ```
 
-As stated above, an `upsert`, `ensure` or `update` cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related. For instance, in the following command, an upsert command is illegally in the scope of a `create` command at the direct upper level -- expecting that a sense exist on a newly created entry make no sense --:
+The preceding command is very useful if the user want to create a new entry only if none of the existing entry with "form=mami" has the gloss given in "has-gloss". In other word, if an entry exist with that sense, we do nothing (appart updating definition and category), but if the sense does not exist, we do not want to create it on any of the existing entry having form="mami": we want to create it on a new entry.
+
+This semantic of two embedded upsert cannot be expressed without the block syntax.
+
+- As stated above, an `upsert`, `ensure` or `update` cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related.
+- For instance, in the following command, an upsert command is illegally in the scope of a `create` command at the direct upper level -- expecting that a sense exist on a newly created entry make no sense --:
 
 ```
 create entry(form@tww = "mami") {
@@ -1771,7 +1805,9 @@ The concise syntax should:
 6. Distinguish selection from creation.
 7. Use LIFT-inspired one-letter component, property and attribute codes.
 
-A surface command is recognized only when a first non-whitespace character at the beginning of a line is one of:
+A LiftPatchShort command line is recognized only when:
+
+- the first non-whitespace character at the beginning of a line is one of:
 
 ```text
 c
@@ -1784,10 +1820,19 @@ s
 l
 ```
 
-followed by a whitespace character.
+and is followed by a whitespace character.
+
+- when it start with "language-default " or "language-create ", for the two commands, e.g.:
+
+```
+language-default object = "tww"
+language-default meta = "en"
+language-create object = "tpi"
+language-create meta = "en"
+```
 
 For reliable extraction from ordinary prose, commands MUST begin at the
-beginning of a line, i.e. should be preceded by a new line character. A command
+beginning of the line or be separated from the beginning of the line only by whitespace. A command
 continues until the end of that physical line.
 
 The concise syntax does not support multiline commands. A long or complex operation must use the reference language instead.
@@ -2006,7 +2051,7 @@ the ordinal pseudo-property in the reference syntax `[index=2]` is expressed wit
 a single integer in the concise syntax:
 
 ```LiftPathShort
-d /e[f="mami"]/s[g="pig"] x[1]
+d /e[f="mami"]/s[g="pig"]/x[1]
 ```
 
 The preceding example is therefore equivalent to:
@@ -2052,7 +2097,7 @@ Translate into:
 
 ```
 create note(type="sociolinguistics", text="my note")
-under sense(gloss="pig")
+under sense[gloss="pig"]
 within entry[form="mami"]
 ```
 
@@ -2098,7 +2143,9 @@ m /e[f="mami"]/s[g="pig"] at index 1
 Translate in:
 
 ```LiftPathRef
-move sense[gloss="pig"] under entry[form="mami"] at index 1
+move sense[gloss="pig"]
+under entry[form="mami"]
+at index 1
 ```
 
 When `move` has a second path, it is equivalent to a move with an under clause in the reference syntax: it moves towards another parent.
@@ -2328,17 +2375,17 @@ For instance, in the following example, the creation construct "o(t="I shot a pi
 c /mami/pig x(t="a mami jefi", o(t="I shot a pig", y="literal"))
 ```
 
-Embedded initializers necessarily translate into several commands:
+Embedded initializers necessarily translate into block syntax with embedded `upsert`:
 
 ```
-create example(text="a mami jefi")
-  under sense[gloss="pig"]
-  within entry[form="mami"]
-
-create translation(text="I shot a pig", type="literal")
-  under example[text="a mami jefi"]
-  within sense[gloss="pig"]
-  within entry[form="mami"]
+sense[gloss="pig"] within entry[form="mami"] {
+  upsert sense(gloss="pig") {
+    upsert example(text="a mami jefi") {
+      upsert translation(text="I shot a pig", type="literal") {
+      }
+    }
+  }
+}
 ```
 
 Recall that two examples cannot have the same text under the same sense (example text is its natural identity), so selecting by value is not ambiguous.
@@ -2346,8 +2393,7 @@ Recall that two examples cannot have the same text under the same sense (example
 Embedded creation rules also include:
 
 - Embedded child creation is atomic with the parent command;
-- an embedded creation uses the semantics of `create` (meaning that an error is raised if the child already exists)
-- nested embedded initializers are allowed
+- an embedded creation uses the semantics of `upsert`.
 
 ## 8. An idiosyncratic construct
 
@@ -2363,13 +2409,13 @@ means:
 p /"mami"/"pig"
 ```
 
-Since, in this, entry form and sense gloss have no withespace or special character, it can be write:
+Since, in this example, the `entry` `form` and the `sense` `gloss` have no withespace or special character, it can be write:
 
 ```
 p /mami/pig
 ```
 
-It is equivalent to:
+It is equivalent to the construct mentionned in the Block section, where two upsert command are embedded:
 
 ```LiftPatchRef
 upsert entry(form="mami", has-gloss="pig") {
@@ -2377,10 +2423,22 @@ upsert entry(form="mami", has-gloss="pig") {
 }
 ```
 
+It is different from the equivalent `create` command:
+
+```
+c /mami s("pig")
+```
+
+This last command will create the `sense` on a non-homophonous "mami" `entry`,
+fail if no such `entry` (or several homophonous entries) exist, and fail if the
+`sense` already exist. On the contrary, the `upsert` construct will not fail if
+the entry+sense exist, and will create the `sense` on a different `entry` if it
+does not, not adding the `sense` on an existing `entry`.
 
 ## 9. A final example
 
-Using implicit field name and embedded initializers, considere the following command:
+Using implicit field name and embedded initializers, considere the following
+command, that used many of the rules previously stated:
 
 ```
 c e("mami", s("pig", x("A mami jefi", o("literal", "I shot a pig")))
@@ -2389,17 +2447,12 @@ c e("mami", s("pig", x("A mami jefi", o("literal", "I shot a pig")))
 It should be translated into:
 
 ```
-create entry(form="mami")
-
-create sense(gloss="pig") under entry[form="mami"]
-
-create example(text="A mami jefi")
-  under sense[gloss="pig"]
-  within entry[form="mami"]
-
-create translation(text="I shot a pig", type="literal")
-  under example[text="A mami jefi"]
-  within sense[gloss="pig"]
-  within entry[form="mami"]
-
+create entry(form="mami") {
+  create sense(gloss="pig") {
+    create example(text="A mami jefi") {
+      create translation(text="I shot a pig", type="literal") {
+      }
+    }
+  }
+}
 ```
