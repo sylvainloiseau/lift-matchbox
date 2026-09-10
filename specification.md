@@ -393,11 +393,11 @@ the two values that allows to uniquely identify the component under a given pare
 
 These identity properties are not a persistent, invariant identity. The gloss of a sense can be changed. They are all natural identity properties.
 
-As can be seen in section "4.1", the Entry component has no identity property. Pseudo-property for the Entry component is discussed below.
+As can be seen in section "4.1", the `entry` component has no identity property. Pseudo-property for the `entry` component is discussed below, under section "5.3.2".
 
-In the context of selection (not the context of creation of a component), when
-the identity property is a multitext, only *one* qualified property must be
-given for the multitext identity property.
+In the context of selection (not the context of creation of a component), i.e.
+between square bracket, when a multitext identity property is mentioned, only
+*one* qualified property must be given for the multitext identity property.
  
 Therefore, the following example will be rejected with 'DUPLICATE_SELECTOR' because the sense is selected by two qualified values:
 
