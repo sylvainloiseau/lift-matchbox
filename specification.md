@@ -1,16 +1,12 @@
 
 # LiftPatch: a Mutation Language (DSL) for the Lift datamodel
 
-This document defines a command DSL, called *LiftPatch*, for creating, updating, deleting, upserting, and moving components and properties in a dictionary based on the LIFT data model.
+This document defines a command DSL, called *LiftPatch*, for creating, updating, deleting, upserting, and moving components and properties in a dictionary based on the LIFT data model. The *LiftPatch* language is not a serialization format: it is a mutation command language for updating the dictionary content. The language preserves the LIFT component hierarchy while making component identity, parentage, property availability, creation, selection, and mutation semantics explicit.
 
-The Lift data model defines the structure of descriptive linguistics dictionary, made of `entry`, `sense`, `example`, `trait`, `note`, `field`, `relation`, etc.
-
-The *LiftPatch* language is not a serialization format: it is a mutation command language for updating the content. The language preserves the LIFT component hierarchy while making component identity, parentage, property availability, creation, selection, and mutation semantics explicit.
-
-A LIFT dictionary is a tree-like structure; it contains *components*, such as
-`entry`, `sense`, or `example`, which are nodes in the tree, and *properties* that
-are attached to the nodes and have datatypes such as the `form` of an `entry`, the
-`gloss` and the `definition` of a `sense`, etc.
+The LIFT dictionary format is intended for the linguistic description of the
+lexicon of a language. It a tree-like structure; it contains *components*, such
+as `entry`, `sense`, or `example`, which are nodes in the tree, and *properties*
+that are attached to the components, such as the `form` (on an `entry` component),  `gloss` or `definition` (on a `sense` component), etc.
 
 ## 1. Design principles
 
@@ -28,9 +24,9 @@ are attached to the nodes and have datatypes such as the `form` of an `entry`, t
 12. `ensure` checks whether a component exists and fails otherwise.
 13. A command or atomic block either succeeds completely or has no effect.
 
-### The two liftPatch language syntax
+### The two liftPatch language surface syntaxes
 
-The liftPatch language comes with two surface syntaxes. The two surface
+The liftPatch language comes with two syntaxes. The two 
 syntaxes have exactly the same semantics. They differ only in surface syntax:
 
 1/ The first syntax, the *LiftPatch reference syntax* (short:
@@ -60,9 +56,9 @@ In both syntaxes, string are quoted by single or double quotes; a single quote i
 
 ### Structure of this document
 
-- Part 1 describes the LIFT dictionary data model and the semantics of the LiftPatch language
-- Part 2 describes the LiftPatch reference syntax
-- Part 3 describes the LiftPatchShort surface syntax
+- Part 1 describes the LIFT dictionary data model and the semantics of the LiftPatch language.
+- Part 2 describes the *LiftPatchRef* reference syntax.
+- Part 3 describes the *LiftPatchShort* concise syntax.
 
 # Part 1. Lift Dictionary and LiftPatch DSL Language semantics
 
@@ -77,7 +73,7 @@ Since a lift dictionary is not a monolingual dictionary, it also has:
 
 ## 2.1. Default languages
 
-At any moment, there is always a default meta language and a default object language that the command can use if a required language is not specified.
+At any moment, there is always a default meta language and a default object language that a command can use if a required language is not specified.
 
 The resolution is as follows:
 
@@ -113,12 +109,12 @@ These defaults apply from their position in the file until overridden:
 language-default object = "tww"
 language-default meta = "en"
 
-set form = "mami"
-on entry[form = "mami"]
+set form = "mammi"       # equivalent to form@<default-object-language>
+on entry[form = "mami"]  # equivalent to form@<default-object-language>
 
-set gloss = "pig"
-  on sense[gloss = "pig"]
-  of entry[form = "mami"]
+set gloss = "piglet"         # equivalent to gloss@<default-meta-language>
+  on sense[gloss = "pig"]    # equivalent to gloss@<default-meta-language>
+  of entry[form = "mamio"]   # equivalent to form@<default-object-language>
 ```
 
 ### Create new languages
@@ -355,15 +351,19 @@ Square brackets always select existing objects. It never creates an object. Pare
 We distinguish:
 
 - a *parent selector*: it is a selector in a `of`, `under`, `on` and `within` clause.
-- a *command selector*: it is the selector of the component directly targeted by a delete, ensure or move command.
+- a *command selector*: it is the selector of the component directly targeted by a `delete`, `ensure` or `move` command or by the select branch of an `upsert` command.
 
-The selector may contain: 
+The selector (but a `within` selector) may contain: 
 
 - for `entry` and `sense`: an ID  (see section "5.3.1 IDs")
 - for all components, the identity property or the combination of two identity properties, depending on the component type (see "5.2 Identity properties")
 - For `entry` only: the qualified form + the has-gloss pseudo-predicate, as described in section "5.3.2".
 - for all components but `entry`: an index selector that selects the component relative to its position among similar-kind components under its parent (see "5.3.3 Ordinal selector")
-- for selector under `within` only, the selector can contain any of this property without constraint (see section "7.3")
+
+The `within` selector (see section "7.3") can contain:
+
+- any of the property allowed on a component, be it identity or not, without the constraint of providing all the identity properties. 
+- it can not contain any of the pseudo-predicates that are not directly manageable: 'hn', 'has-gloss', 'index', 'ID'.
 
 It must contain only one of these four possible selector strategies. If several are given (for instance, an index and an ID, or an ID and the two identity properties), the validator MUST reject the selector with a 'DUPLICATE_SELECTOR' error.
 
@@ -1020,18 +1020,20 @@ within entry[form@tww = "mami"]
 
 #### 7.3.1 Syntax
 
-The `within` clause chains a PARENT component (to the right) with a child component (to the left). Several `within` clauses can be consecutive.
+The `within` clause chains a PARENT component (to the right) with a child component (to the left). The child comonent to the left is the selector of a `under`, a `of` or a `on` clause. Several `within` clauses can be consecutive.
 
 Its syntax is:
 
 ```text
-CHILD[SELECTOR] within PARENT[SELECTOR]
+(of|on|under) CHILD[SELECTOR]
+within PARENT[SELECTOR]
 ```
 
 when consecutive `within` clauses occur, the first node is a child of the second, which in turn is the child of the third:
 
 ```text
-CHILD[SELECTOR] within PARENT[SELECTOR]
+(of|on|under) CHILD[SELECTOR]
+within PARENT[SELECTOR]
 within PARENT[SELECTOR]
 ```
 
@@ -2374,8 +2376,8 @@ Consider the following notations:
 
 - language code with unquoted string for entry form and sense gloss:
 
-```
-/mami@tww
+```LiftPatchShort
+d /mami@tww
 ```
 
 ```
@@ -2384,13 +2386,13 @@ Consider the following notations:
 
 - language code when creating an entry with abbreviated initalizer
 
-```
+```LiftPatchShort
 c e("mami"@pig)
 ```
 
 - creating an example, expressing language code on sense gloss (in path) and example text only:
 
-```
+```LiftPatchShort
 c /"mami"/"pig"@de x("a mami jefi"@en)
 ```
 
