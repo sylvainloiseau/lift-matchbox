@@ -2387,13 +2387,13 @@ d /mami@tww
 - language code when creating an entry with abbreviated initalizer
 
 ```LiftPatchShort
-c e("mami"@pig)
+c e("mami"@tww)
 ```
 
-- creating an example, expressing language code on sense gloss (in path) and example text only:
+- creating an example, with qualified sense's `gloss` property (in the path) and qualified example `text` property:
 
 ```LiftPatchShort
-c /"mami"/"pig"@de x("a mami jefi"@en)
+c /"mami"/"Schwein"@de x("a mami jefi"@tww)
 ```
 
 ## 7. Embedding initializer
