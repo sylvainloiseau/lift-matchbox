@@ -1,7 +1,50 @@
 # lift-patchbox
 
-A Java library for parsing and executing DSL commands to mutate LIFT dictionary
-data, a dictionary format used for linguistic description of lexical data.
+A complete language, with both a lighweight and a verbose syntax sharing the same semantics, for editing a dictionary into LIFT format.
+
+Instead of opening Elan or Fieldwork explorer for entering lexical information, type directly your fieldnote / idea using this command language, or convert questionaire/spreadsheet into such commands:
+
+```
+##
+## creating quickly new entry + a new gloss
+## c = create, e = entry, s = sense
+## the entry should not exist -- to avoid error, see below
+##
+c e("mami", s("pig"))
+c e("efe", s("door"))
+c e("o", s("child"))
+
+## If you need to add more info:
+c e("mami", s("pig")) as $mami
+
+
+## or use the block construct:
+create entry[form="mami"] {
+   create sense[gloss="pig"] {
+      create example[text="a mami jefi"] {
+          create translation[type="free", text="I shoot a pig"]
+      }
+   }
+}
+
+## Adding a new interesting example on an existing entry>sense
+### Long reference syntax:
+create exemple(text="A mamimo jefimwij")
+   under sense[gloss="pig"] within entry[form="mami"]
+   {
+   create transation(type="litteral", text="I shot a pig in particular")
+}
+### Or use the concise syntax:
+
+set category = "Noun" on sense[gloss="pig"] of entry[form="mami"]
+
+A very usefull construct
+p /mami/pig         # - create new mami entry with the sense "pig"
+                    #   if no mami entry exist
+                    #   or if none of the mami entry has the sense "pig"
+                    # - do nothing if a mami entry exist with sense "pig".
+```
+
 
 ## Overview
 
