@@ -1,5 +1,5 @@
 
-# LiftPatch: a Mutation Language (DSL) for the Lift datamodel
+# LiftPatch: a mutation language for the LIFT data model
 
 This document defines a command DSL, called *LiftPatch*, for creating, updating, deleting, upserting, and moving components and properties in a dictionary based on the LIFT data model. The *LiftPatch* language is not a serialization format: it is a mutation command language for updating the dictionary content. The language preserves the LIFT component hierarchy while making component identity, parentage, property availability, creation, selection, and mutation semantics explicit.
 
@@ -49,7 +49,7 @@ The pragma may carry named attributes after the version number, written
 
 An unknown attribute is rejected with `UNKNOWN_PRAGMA_ATTRIBUTE`.
 
-### The two liftPatch language surface syntaxes
+### 1.2 The two surface syntaxes
 
 The liftPatch language comes with two syntaxes. The two 
 syntaxes have exactly the same semantics. They differ only in surface syntax:
@@ -62,9 +62,9 @@ It is a verbose and explicit language.
 LiftPatch reference commands are contained in a script file, "Lift patch reference script". This file contains only:
 
 - commands that start on their own line with one of the eight verbs (set, upsert, update, clear, delete, ensure, create, move).
-- *block headers*, together with their opening `{` and their closing `}` line (see section "11. Block construct").
-- scope directives: `language-default`, `language-create`, and the `with` block (see section "2.1 Default languages").
-- the optional version pragma `%liftpatch 1.0` (see section "1.1 Language version").
+- *block headers*, together with their opening `{` and their closing `}` line (see section "11").
+- scope directives: `language-default`, `language-create`, and the `with` block (see section "2.1").
+- the optional version pragma `%liftpatch 1.0` (see section "1.1").
 - comments. A comment starts with an unquoted `#` and runs to the end of the physical line. A comment may occupy a whole line, or follow a command on the same line (*inline comment*). A `#` occurring inside a quoted string is an ordinary character, not a comment marker.
 
 2/ The second syntax, the *LiftPatch short language* (short: *LiftPatchShort*) is more concise.
@@ -81,7 +81,7 @@ LiftPatchShort commands are:
 
 In both syntaxes, string are quoted by single or double quotes; a single quote is escaped as '' in a single-quoted string; double quote is escaped as \" in a double-quoted string.
 
-### Structure of this document
+### 1.3 Structure of this document
 
 - Part 1 describes the LIFT dictionary data model and the semantics of the LiftPatch language.
 - Part 2 describes the *LiftPatchRef* reference syntax.
@@ -91,9 +91,9 @@ In both syntaxes, string are quoted by single or double quotes; a single quote i
 - Appendix C gives the EBNF grammar of each of the two surface syntaxes.
 - Appendix D gives the conformance corpus: a machine-readable set of cases, each with a dictionary, a script and the expected outcome, which an implementation must pass to claim conformance.
 
-# Part 1. Lift Dictionary and LiftPatch DSL Language semantics
+# Part 1. Data model and semantics
 
-## 2 LIFT Dictionary
+## 2. The LIFT dictionary
 
 A lift dictionary is a list of `entry` components.
 
@@ -114,7 +114,7 @@ Since a lift dictionary is not a monolingual dictionary, it also has:
 - an ordered list of object languages, i.e. one or more languages that are described in the dictionary. These are, for instance, the languages represented in the `entry` `form` or in the `example` `text`. The list cannot be empty.
 - an ordered list of meta languages, i.e. one or more languages that are used to describe the object language. These are, for instance, the languages used in the `gloss` and the `definition` properties of a `sense`, or the `translation` of the `example`. The list cannot be empty.
 
-## 2.1. Default languages
+### 2.1 Default languages
 
 At any moment, there is always a default meta language and a default object language that a command can use if a required language is not specified.
 
@@ -166,7 +166,7 @@ referred to by this directive must exist in the dictionary's meta (respectively,
 
 The scope of a `language-default` directive is:
 
-- the remainder of the enclosing block, if the directive occurs inside a block (see section "11. Block construct"), including any nested block, and *not* beyond the closing brace of that block;
+- the remainder of the enclosing block, if the directive occurs inside a block (see section "11"), including any nested block, and *not* beyond the closing brace of that block;
 - otherwise, the remainder of the script file.
 
 A directive occurring in an inner scope shadows any directive of the same kind
@@ -218,7 +218,7 @@ K, with the same scope rules as a `language-default K` directive placed at the
 same position. It can be overridden afterwards by a `language-default` directive
 or by a `with` block.
 
-## 3. LIFT components
+## 3. Components and parentage
 
 A **component** is a structural LIFT node such as an `entry`, `sense`, or `example`. A component contains one or several properties.
 
@@ -281,7 +281,7 @@ selected by its position **in the list of its same-type siblings** — not by it
 position among all the children of the parent — as described below in section
 "5.3.3 Ordinal selectors".
 
-## 4. Lift Properties
+## 4. Properties
 
 A **property** is a LIFT datafield such as `form`, `gloss`, or `definition`, that is attached on a component instance.
 
@@ -296,13 +296,13 @@ The following table lists the properties. Each row gives a property name; the fo
     - Integer,
     - Reference (a string containing the ID of an `entry` or `sense`),
     - URL (a string containing an URL).
-  - Non scalar: multitext, which is a Map containing several strings associated to keys that are a lang code (more on this below, section "4.2. The multitext datatype")
+  - Non scalar: multitext, which is a Map containing several strings associated to keys that are a lang code (more on this below, section "4.2")
 - `Qualifier`: a multitext property value is qualified if a language name is also specified. A multitext property may contain several language-qualified values, but each language may occur at most once.
   - `O` — object language qualifier required or defaultable, for example `form@tww`.
   - `M` — meta language qualifier required or defaultable, for example `gloss@en`.
   - `—` — no language qualifier.
 - `Required at creation`: indicate whether this property must be initialized with a value at creation. For a multitext, this means that at least one qualified value must be set.
-- `Natural identity`: indicate if this property belongs to the *natural identity property set* of the component type, as defined in section "5.2 Natural identity". A component type has a natural identity property set of zero, one, or two properties. When a multitext belongs to that set, only *same-language* values are compared: a qualified value `p@L` of one component is compared with the qualified value `p@L` of a sibling for the same language `L`, never with a value in another language, and unset qualified values never take part in the comparison.
+- `Natural identity`: indicate if this property belongs to the *natural identity property set* of the component type, as defined in section "5.2". A component type has a natural identity property set of zero, one, or two properties. When a multitext belongs to that set, only *same-language* values are compared: a qualified value `p@L` of one component is compared with the qualified value `p@L` of a sibling for the same language `L`, never with a value in another language, and unset qualified values never take part in the comparison.
 
 The table is exhaustive and normative for semantic validation. It is the
 human-readable rendering of the normative metamodel given in "Appendix A. The
@@ -397,12 +397,12 @@ code `ILLEGAL_LANGUAGE` used by earlier drafts is withdrawn.
 
 Each id-bearing component (`sense` and `entry`) has only one ID.
 
-### 4.4 Syntax for referring to qualified values of multitext property
+### 4.4 Language qualifiers
 
 Whether a property accepts a language key is decided by its `Datatype` column in
 the table of section "4.1": every multitext property accepts a language key, and
-no scalar property does. The two lists given below are a convenience rendering
-of that table (and of Appendix A); they are not an independent source of truth.
+no scalar property does. That table, and Appendix A behind it, is the only list
+of which property is which.
 
 Lang are selected with the suffix `@<lang>`.
 
@@ -419,34 +419,8 @@ transcription@tww
 The `@lang` key allows to refer to a qualified string value of a multitext property
 value, i.e. a "sub-entries".
 
-The following properties are multitexts and support a language key:
-
-```text
-form
-definition
-gloss
-text
-source
-label
-transcription
-comment
-```
-
-The following properties are scalar and do not support a language key:
-
-```text
-type
-morpheme
-category
-target
-url
-value
-when
-who
-```
-
-The pseudo-properties `hn`, `index` and `id` (section "5.3") are not properties
-and never accept a language key. The pseudo-predicate `has-gloss` does accept
+The pseudo-properties `hn`, `id` and the ordinal `#n` (section "5.3") are not
+properties and never accept a language key. The pseudo-predicate `has-gloss` does accept
 one, because it is a shorthand for a predicate over the multitext `gloss`
 (section "5.3.2.2").
 
@@ -472,9 +446,9 @@ It is allowed only where a set of qualified values is meaningful:
 targets, which must designate exactly one qualified value; the error is
 `WILDCARD_NOT_ALLOWED`.
 
-## 5. Selecting component using component identity properties in selectors and commands
+## 5. Selection
 
-### 5.1 Selector syntax
+### 5.1 Selectors
 
 Square brackets always select existing objects. They never create an object. Parents are not implicitly created by a selector. Parent creation is explicit.
 
@@ -491,7 +465,7 @@ PREDICATE-LIST ::= PREDICATE { ',' PREDICATE }
 
 The predicates of a list are combined by conjunction: a component matches the
 step when it matches *every* predicate of the list. A step may also be replaced
-by a label reference (`$name`, see section "6.3 Labels").
+by a label reference (`$name`, see section "6.3").
 
 A *chain* links a step to its ancestors through an *axis*:
 
@@ -504,7 +478,7 @@ AXIS  ::= '/'    (strict parent, also written `of` / `under` / `on`)
 `/` and `of`/`under`/`on` are the same axis, and `//` and `within` are the same
 axis; the keyword forms are the readable aliases used throughout Part 2, the
 operator forms are used in Part 3. The two forms may not be mixed inside one
-chain. The semantics of the two axes are given in sections "7.2" and "7.3".
+chain. The semantics of the two axes are given in sections "7.3" and "7.3".
 
 We distinguish:
 
@@ -604,7 +578,7 @@ A filtering selector (the right-hand side of `within`, and the step inside a
 
 A filtering selector may match zero, one, or several components; what must be
 unambiguous is the result of the whole chain, not the result of each step (see
-section "7.3").
+section "7.4").
 
 #### 5.1.5 Resolution rules
 
@@ -612,10 +586,10 @@ A selector resolves to a set. The following rules are mandatory:
 
 1. An empty result raises `NOT_FOUND`.
 2. When a unique result is required, more than one result raises `AMBIGUOUS_REFERENCE`.
-3. A command requiring one component must receive exactly one component, unless it carries an explicit multiplicity keyword (section "5.7 Multiplicity").
+3. A command requiring one component must receive exactly one component, unless it carries an explicit multiplicity keyword (section "5.6").
 4. Component type and parent type compatibility are checked before dictionary lookup.
 5. Selector comparisons use the declared language and datatype.
-6. Selectors are re-evaluated for each command, against the state of the dictionary produced by the preceding commands of the script.
+6. Selectors are re-evaluated for every command, against the state left by the preceding commands (section "12.1").
 
 ### 5.2 Natural identity
 
@@ -659,11 +633,9 @@ invariant identity: the gloss of a sense can be changed, which changes its
 identity key. The persistent identity is the `id` pseudo-property (section
 "5.3.1").
 
-In the context of selection (not the context of creation of a component), i.e.
-between square brackets, when a multitext identity property is mentioned, only
-*one* qualified value must be given for that property.
- 
-Therefore, the following example will be rejected with 'DUPLICATE_SELECTOR' because the sense is selected by two qualified values:
+In a selector, a multitext identity property must be given exactly one qualified
+value (section "5.5.2"). The following example is therefore rejected with
+`DUPLICATE_SELECTOR`, the sense being selected by two qualified values:
 
 ```text
 set text = "My field"
@@ -688,11 +660,11 @@ of sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
-#### Identity and multitext property
+#### 5.2.1 Identity on a multitext property
 
 When a multitext property is a natural identity property, the uniqueness means that, when for each language in the relevant language set (meta or object), in the group of components that have a value set for this language and this property, there is no duplicate. Unset qualified value does not count in the identity checking.
 
-### 5.3 Pseudo-properties used for selecting component
+### 5.3 Pseudo-properties
 
 These pseudo properties are defined. They do not participate in component identity.
 
@@ -734,10 +706,10 @@ Here is a normative summary of the id rule:
 - The `id` cannot be set, deleted, initialized during creation, or cleared.
 - The `id` can be used as a lookup predicate in a command selector and in a parent selector on the `/` axis (in `of`, `under`, `on`); it is forbidden in a filtering selector (`within`, `has`).
 - The `id` can be used as a lookup predicate with the `move` and `delete` commands.
-- The `id` is the only way to designate a component by a value that the script did not itself choose; a component created by the running script is designated by a label instead (section "6.3 Labels").
+- The `id` is the only way to designate a component by a value that the script did not itself choose; a component created by the running script is designated by a label instead (section "6.3").
 
 
-#### 5.3.2 The case of `entry`: disambiguation of homophone entries with 'hn' and 'has-gloss'
+#### 5.3.2 Disambiguating homophonous entries: `hn` and `has`
 
 Homophones are pervasive in language and therefore in dictionary entries. Since
 entries are not grouped in small sets under parents, but are all directly under
@@ -750,31 +722,21 @@ For `entry`, only the `id` can uniquely identify an instance by itself. However,
 For practical purposes, two refinements of strategy S4 are offered, which are
 expressed together with the `form` property in order to disambiguate homophone
 entries and select an `entry` uniquely: the `hn` pseudo-property and the `has`
-child-existence predicate (of which `has-gloss` is a shorthand). Since they are a
-selecting mechanism only, and not natural identity properties, both:
+child-existence predicate (of which `has-gloss` is a shorthand).
 
-- can be used where unique selection takes place: a command selector (`delete`, `move`, `ensure`), a parent selector on the `/` axis (`under`, `of`, `on`), and — for `has`/`has-gloss` only — the select branch of `upsert`;
-- as far as `hn` and the `has-gloss` shorthand are concerned, are forbidden in a filtering selector (`within`, or inside a `has`), where they raise `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`. The general `has` predicate is not restricted in this way: it may appear in a filtering selector and may be nested inside another `has`;
-- are never initializers: they cannot be written in a `create` initializer list, and they are never applied with `set` semantics by `upsert`;
-- are forbidden with `hn` for `upsert` altogether (see section "5.3.2.1").
-
-They are not natural identity properties, since they refer to a context outside
-of the `entry` itself: `hn` depends on the other entries of the dictionary, and
-`has` depends on the children of the entry.
+They are a selecting mechanism only. They are not natural identity properties,
+since they refer to a context outside of the `entry` itself: `hn` depends on the
+other entries of the dictionary, and `has` depends on the children of the entry.
+They are therefore never initializers, and never applied with `set` semantics.
+Where each of them may appear is given once, in the table of section "5.4.2";
+the two subsections below define what each of them means.
 
 ##### 5.3.2.1 The homophone number (`hn`)
 
-All homophonous entries share the same qualified form, but have a different
-homophone number ('hn').
-
-The homophone number ('hn') is not a natural identity property: on a given
-`entry`, it depends on the number of other entries with the same form, which is not
-a natural property of the `entry` itself. However, the form + the homophone number
-('hn') allows to uniquely select an `entry` in the dictionary at any given state of the dictionary: two entries can have
-the same qualified form, but no two entries can have the same value for both
-the qualified form and the homophone number ('hn'). It is a contextual lookup key rather than an identity property.
-
-The value of an `hn` pseudo-property is an Integer, without quotes.
+All homophonous entries share the same qualified form but have a different
+homophone number (`hn`), so that the pair (qualified form, `hn`) selects one
+entry at any given state of the dictionary. The value is an integer, written
+without quotes.
 
 **Model.** For the purposes of this language, `hn` is an opaque lookup key
 assigned by the dictionary. The normative model is minimal and deliberately
@@ -793,14 +755,12 @@ rule is withdrawn, because it made the validity of a selector depend on entries
 that the selector does not mention, and made a script stop working when an
 unrelated homophone was deleted.)
 
-**Usage rules.**
+**Usage rules.** Where `hn` may and may not appear is given by the table of
+section "5.4.2"; using it elsewhere raises `COMMAND_NOT_ALLOWING_HN`, or
+`PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` in a filtering selector. One of its
+restrictions needs its own justification:
 
-- `hn` cannot be set by any initializer: it is managed internally by the dictionary.
-- `hn` cannot be the target of a `set`, `clear` or `update` command, and cannot appear in a `create` initializer list.
-- `hn` can be used in the command selector of `delete`, `move` and `ensure`, and in a parent selector on the `/` axis.
-- `hn` is **forbidden in the initializer list of an `upsert`**, that is, as a predicate of the component being upserted (error `COMMAND_NOT_ALLOWING_HN`). `upsert` has a create branch, and `hn` cannot be given to a component that does not exist yet: asking to create "the entry that is the second homophone" is meaningless. Either the entry with this `hn` exists, in which case `ensure` or a plain selector applies, or it does not, in which case `create` applies. Use `has`/`has-gloss` when an `upsert` on an entry must be disambiguated (section "8.2"). `hn` remains allowed in the *parent* selector of an `upsert` command (`upsert sense(...) under entry[form@tww = "mami", hn = 1]`), which is a pure selection.
-- Use of `hn` with a command that does not allow it raises `COMMAND_NOT_ALLOWING_HN`.
-- `hn` is forbidden in a filtering selector (`within`, `has`): `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`.
+- `hn` is **forbidden in the initializer list of an `upsert`**, that is, as a predicate of the component being upserted. `upsert` has a create branch, and `hn` cannot be given to a component that does not exist yet: asking to create "the entry that is the second homophone" is meaningless. Either the entry with this `hn` exists, in which case `ensure` or a plain selector applies, or it does not, in which case `create` applies. Use `has`/`has-gloss` when an `upsert` on an entry must be disambiguated (section "8.2"). `hn` remains allowed in the *parent* selector of an `upsert` command (`upsert sense(...) under entry[form@tww = "mami", hn = 1]`), which is a pure selection.
 
 In a selector, `hn` cannot be used alone, but always together with the `form` property:
 
@@ -879,7 +839,7 @@ entry[form@tww = "mami", has sense[category = "Verb", has example[text@tww ~ "je
 
 `has` is an existential predicate: it filters the component it is attached to,
 and it never designates the matched child. To operate *on* the child, use the
-`within` axis (section "7.3"), of which `has` is the predicate counterpart:
+`within` axis (section "7.4"), of which `has` is the predicate counterpart:
 `C within P[…]` selects `C`, whereas `P[has C]` selects `P`.
 
 The most frequent case by far — an entry disambiguated by the gloss of one of
@@ -966,7 +926,7 @@ of entry[
 ]
 ```
 
-Another option could be to use `within`, as described in section "7.3" below:
+Another option could be to use `within`, as described in section "7.4" below:
 
 ```LiftPatchRef
 create example(
@@ -980,21 +940,12 @@ within entry[
 ]
 ```
 
-- it does not participate in entry identity;
-- it is combined with the `form` predicate, and possibly with other `has` / `has-gloss` predicates, inside the single selection strategy S4 (section "5.1.3");
-- if several entries satisfy it, the selector remains ambiguous and an `AMBIGUOUS_REFERENCE` error is raised.
-
-Neither `has` nor `has-gloss` can be set by any initializer. They can be used
-only in selection operations (as lookup predicates): together with the `form`
-property in the command selector of `delete`, `move` and `ensure`, in a parent
-selector on the `/` axis, and in the select branch of `upsert`. If the create
-branch of `upsert` is executed, `has`/`has-gloss` is not taken into account and
-an `entry` is created with the given form, even if it results in creating
-homophones.
-
-The use of `has-gloss` — or of a `has` predicate — with a command that does not
-allow it, `create` in particular, raises `COMMAND_NOT_ALLOWING_HAS_GLOSS`. This
-is the only error code for this condition.
+Where `has` and `has-gloss` may appear is given by the table of section "5.4.2";
+using either with a command that does not allow it, `create` in particular,
+raises `COMMAND_NOT_ALLOWING_HAS_GLOSS`, which is the only error code for that
+condition. One consequence is specific to `upsert`: if its create branch runs,
+`has` / `has-gloss` is not taken into account, and an `entry` is created with the
+given form even if that produces a homophone (section "8.2.3").
 
 #### 5.3.3 Ordinal selectors
 
@@ -1088,13 +1039,13 @@ Reading rules:
 
 #### 5.4.3 (Deprecated) Command applicability table
 
-> **Deprecated — superseded by the tables of sections 5.5.1 and 5.5.2, to be deleted later.**
+> **Deprecated — superseded by the tables of sections "5.4.1" and "5.4.2", to be deleted later.**
 >
 > The table below is kept only for comparison with earlier drafts. Its rows do
 > not form a partition (an optional non-identity multitext matches three of
 > them), its parent-selector column merges the `/` and `//` axes, which have
 > different rules, and several of its cells are contradicted by the prose. Where
-> it disagrees with sections 5.5.1 and 5.5.2, sections 5.5.1 and 5.5.2 prevail.
+> it disagrees with sections "5.4.1" and "5.4.2", those sections prevail.
 
 | Property kind | `delete` | `move` | `create` | `upsert` | `ensure` | on parent selector (in `under`, `on`, `within` clause) | `set` | `update` | `clear` |
 |---|---|---|---|---|---|---|---|---|---|
@@ -1176,7 +1127,7 @@ An unqualified multitext identity property use the default object or meta langua
 sense[gloss = "pig"]    # equivalent to gloss@<default-meta-language>
 ```
 
-#### 5.5.3 Clearing
+#### 5.5.3 Qualifiers in `clear`
 
 On a multitext property, `clear` requires an **explicit** qualifier: either a
 language code, or the wildcard `@*`.
@@ -1197,28 +1148,10 @@ allowed and none is needed:
 clear category
 ```
 
-For a required or identity multitext property:
-
-```text
-clear gloss@en
-```
-
-is legal only if another qualified `gloss` value remains, and:
-
-```text
-clear gloss@*
-```
-
-is never legal, since it would empty the property. Both violations raise
-`CANNOT_CLEAR_REQUIRED_MULTITEXT`. Then:
-
-> A required multitext property may lose individual language values, but may never become empty.
-
-and, symmetrically:
-
-> A required scalar property, and any identity property, may never become unset.
-
-The complete decision table is given in section "9.3.1".
+Which qualifier is *accepted* is a question of syntax, and is settled here.
+Whether a syntactically valid `clear` then succeeds depends on the role of the
+property and on its current state, and is settled by one normative table, the
+decision table of section "9.3.1".
 
 ### 5.6 Multiplicity: `each` and `all`
 
@@ -1250,7 +1183,7 @@ set category = "Noun"
 Without a multiplicity keyword, a target step matching more than one component
 raises `AMBIGUOUS_REFERENCE`, unchanged.
 
-## 6. Initializers and creation syntax
+## 6. Creation: initializers, position, labels
 
 The parenthesized values are initializers. They do not select an existing
 component. On the contrary, square brackets select existing components, they do
@@ -1273,7 +1206,7 @@ of entry[
 ]
 ```
 
-### 6.1 Creation and initializer rules
+### 6.1 Initializer rules
 
 For `create` and the creation branch of `upsert`:
 
@@ -1366,9 +1299,9 @@ system-generated `id` that the script does not know, an `hn` that the script
 does not control, and a form that is ambiguous. Without a label it cannot be
 referred to at all.
 
-# Part 2. The `LiftPatchRef` LiftPatch reference syntax
+# Part 2. The LiftPatchRef reference syntax
 
-## 7. Core command syntax
+## 7. Command structure
 
 There are five *component commands* (commands directly targeting a component):
 
@@ -1377,8 +1310,6 @@ There are five *component commands* (commands directly targeting a component):
 - delete
 - ensure
 - upsert
-
-`entry` does not have an "under PARENT" clause since an entry is at the dictionary root. `entry` cannot be moved: `move entry[...]` is a **syntax error**, rejected by the parser, not a runtime condition.
 
 The syntax for each case is:
 
@@ -1399,15 +1330,14 @@ ensure entry[SELECTOR]
 ensure COMPONENT[SELECTOR] under PARENT
 ```
 
-`entry` has **no `at POSITION` clause**: the order of the entry list belongs to
-the dictionary, not to the script (section "2"), which is the same reason why
-`move entry[...]` is a syntax error and why an entry cannot be selected by an
-ordinal. Writing `create entry(form@tww = "mami") at beginning` is a syntax
-error.
+`entry` differs from every other component type in three ways, all of which
+follow from its position at the root and from the dictionary — not the script —
+owning the order of the entry list (section "2"): it takes no `under` clause, it
+takes no `at POSITION` clause, and `move entry[...]` is a syntax error.
 
-`move` cannot target an `entry` component. `ensure` takes a **selector between
-square brackets**, not an initializer list: it asserts, it never creates
-(section "8.3"). It may target any component type, including `entry`.
+`ensure` takes a **selector between square brackets**, not an initializer list:
+it asserts, it never creates (section "8.3"). It may target any component type,
+`entry` included.
 
 The three *property commands* (command directly targeting a property):
 
@@ -1423,7 +1353,7 @@ A property command carries one assignment in the common case, and may carry
 several for the same parent, which is defined as the sequence of the
 corresponding single-property commands (section "9.1.1").
 
-#### 7.0.1 The eight verbs as a precondition/postcondition matrix
+### 7.1 The eight verbs: preconditions and postconditions
 
 The five component commands differ only in what they require of the dictionary
 before they run and in what they leave behind. Reading them as a matrix removes
@@ -1445,25 +1375,13 @@ And for the three property commands:
 | `update` | `UNSET_QUALIFIED_PROPERTY` / `UNSET_PROPERTY` | replaces the value |
 | `clear` | see the decision table of section "9.3.1" | removes the value, subject to the invariants of section "5.5.3" |
 
-In prose:
-
-- `create COMPONENT(...)` requires that the component does not already exist
-  (according to the natural identity of the component type); if it does, the error
-  `CANNOT_CREATE_DUPLICATE` is raised;
-- `upsert COMPONENT(...)` creates or resolves the component;
-- `ensure COMPONENT[...]` asserts that the component exists and fails with
-  `NOT_FOUND` otherwise; it creates nothing and modifies nothing;
-- `set PROPERTY = VALUE` creates the property if absent and replaces
-  its value if present;
-- `update PROPERTY = VALUE` requires an existing property and replaces
-  its value; if the targeted (qualified) value is not already set, an
-  `UNSET_QUALIFIED_PROPERTY` or `UNSET_PROPERTY` error is raised;
-- `clear PROPERTY` removes the selected property value(s), subject to the
-  decision table of section "9.3.1".
+"Component absent" and "component present" are decided by the natural identity
+of the component type (section "5.2"), against the siblings under the resolved
+parent. Each verb is defined in full in sections "8" and "9".
 
 For all *property commands*, if the command refers to a property that does not exist on its parent type according to the table in section "4.1", an error 'PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE' is raised.
 
-### 7.1 Selecting direct parent with `under` or `on`
+### 7.2 The immediate parent: `under` and `on`
 
 For all eight commands, PARENT refers to the parent component of the targeted property or component. The parent is identified by either the `under` or the `on` keyword, then a mandatory component name, and then a mandatory `[SELECTOR]`.
 
@@ -1471,14 +1389,14 @@ For all eight commands, PARENT refers to the parent component of the targeted pr
   - there is no `under` clause when the target of the command is an entry, since an entry is at the root of the hierarchy and has no parent
 - `on` identifies the immediate parent of a property directly targeted by a property command (set, update, clear)
 
-### 7.2 Selecting other ancestor with `of`
+### 7.3 Further ancestors: `of`
 
 If the component selected by `under` or `on` is not an entry, further ancestor
 clauses must be used, **`of` clauses or `within` clauses, in any combination**,
 until an entry is reached. What is mandatory is that the chain of ancestors be
 continued up to the root; which of the two keywords continues it is a separate
-choice, made link by link, between strict selection (`of`, section "7.2") and
-existential filtering (`within`, section "7.3").
+choice, made link by link, between strict selection (`of`, section "7.3") and
+existential filtering (`within`, section "7.4").
 
 - An additional `of` or `within` clause can qualify that parent with its own parent
 - Multiple such clauses can be chained together, and the two keywords may alternate freely. Every `of` or `within` selector must be a parent of the previous component.
@@ -1486,7 +1404,7 @@ existential filtering (`within`, section "7.3").
 - skipped ancestors are not allowed
 - `of`, `under` and `on` are the three keyword spellings of the same axis, the strict-parent axis, written `/` in Part 3. Which keyword is used depends only on the position in the command, never on the semantics: `under` before the immediate parent of a component command, `on` before the immediate parent of a property command, `of` before every further ancestor.
 
-#### 7.2.1 An `of` clause followed by a `within` chain
+#### 7.3.1 An `of` clause followed by a `within` chain
 
 An `of` (or `under`, or `on`) clause that is followed by one or more
 `within` clauses does not change meaning: it still designates exactly one
@@ -1510,7 +1428,7 @@ and `NOT_FOUND` when none remains — the same two errors as an `of` clause with
 no `within` after it.
 
 When the `of` clause is not followed by a `within` clause, the group is reduced
-to the clause itself, and the requirement falls back to what section "7.2" says:
+to the clause itself, and the requirement falls back to what section "7.3" says:
 the selector alone must select exactly one component, using one selection
 strategy.
 
@@ -1613,21 +1531,29 @@ on sense[gloss@en = "pig"]
 of entry[form@tww = "mami"]
 ```
 
-### 7.3 Replacing `of` with `within` for existential filtering semantics
+### 7.4 Existential ancestors: `within`
 
-While each `of` clause explicitly selects a component among its siblings, `within` allows for a existential filtering strategy. The logic is : *Keep parent P if ∃ child C in P such that C matches selector S.*
+While each `of` clause explicitly selects a component among its siblings,
+`within` allows for an existential filtering strategy. The logic is: *keep parent
+P if ∃ child C in P such that C matches selector S.*
 
-`within` allow for intermediate multiplicity, but the final evaluation of a within chain must result in a single child component, otherwise an `AMBIGUOUS_REFERENCE` is raised. If no child component is selected, an `NOT_FOUND` error is raised.
+The normative rule is the **existential join**:
 
-- with `of`, a component is selected if it satisfies its own selectors. As mentioned, the selector must contain all the identity properties so that the component is selected unambiguously.
-- with `within`, a component is selected if:
-  - first, it belongs to one or more components selected (the selector at the right of `within` can contain any number of properties, identity property or not, that allows for several matches)
-  - secondly, it matches the condition expressed in the selector at the left of the `within` selector).
-  - For a chain `C0 within C1 ... within Cn`, construct the set of candidate paths `(c0, c1, ..., cn)` such that each `ci` matches its selector and each `ci` is a direct child of `c(i+1)`. This is an existential join over the chain, not independent selection of each component. The command succeeds only when exactly one complete candidate path remains; it raises `NOT_FOUND` when none remain and `AMBIGUOUS_REFERENCE` when two or more remain.
-- it is then allowed to use any property in a selector targeted by within, for instance the category property on sense, that is not an identity property
-- if the `within` chain result in one component, it succeed.
-- If several components match, then an `AMBIGUOUS_REFERENCE` error is raised.
-- If no component is kept at the end, then a `NOT_FOUND` is raised.
+> For a chain `C0 within C1 … within Cn`, construct the set of candidate paths
+> `(c0, c1, …, cn)` such that each `ci` matches its selector and each `ci` is a
+> direct child of `c(i+1)`. This is a join over the whole chain, not an
+> independent selection of each component. The chain succeeds only when exactly
+> one complete candidate path remains; it raises `NOT_FOUND` when none remains
+> and `AMBIGUOUS_REFERENCE` when two or more remain.
+
+Two consequences follow, and they are what distinguishes `within` from `of`:
+
+- an individual `within` selector may match several components, and may use any property of the component, identity property or not (it is a *filtering selector*, section "5.1.4"). Only the result of the chain must be unique;
+- a `within` clause never creates anything: it is a selector constraint, and a missing ancestor makes the command fail rather than be created (section "7.4.6").
+
+Two further errors can end a `within` chain: `ILLEGAL_PARENT`, when the
+components named cannot be related according to the hierarchy of section "3",
+and `DUPLICATE_SELECTOR`, when the same ancestor constraint is written twice.
 
 
 For instance, the following example contains a chain of two within clause 
@@ -1652,7 +1578,7 @@ within sense[category = "Verb"]
 within entry[form@tww = "mami"]
 ```
 
-#### 7.3.1 Syntax
+#### 7.4.1 Syntax
 
 The `within` clause chains a PARENT component (to the right) with a child component (to the left). The child component to the left is the selector of a `under`, a `of` or a `on` clause. Several `within` clauses can be consecutive.
 
@@ -1715,11 +1641,14 @@ within NEXT_PARENT
 within NEXT_PARENT
 ```
 
-#### 7.3.2 Properties allowed in a `within` selectors
+#### 7.4.2 Selectors allowed in a `within` clause
 
-The selector of a `within` clause may contain any property of the component, not only the identity properties, since a `within` clause is not responsible for uniquely and unambiguously selecting one component alone. This excludes the pseudo-predicates that are not directly manageable: 'hn', 'has-gloss', '#n', 'id'.
+The selector of a `within` clause is a *filtering selector*, defined once in
+section "5.1.4": any property of the component, in any number, with any
+predicate form, and no pseudo-property — `hn`, `has-gloss`, `id` and the ordinal
+`#n` raise `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` there.
 
-#### 7.3.3 Selection algorithm
+#### 7.4.3 Resolution algorithm
 
 Here is an example. Let's focus on the following example.
 
@@ -1738,7 +1667,7 @@ then rewrites `value`.)
 
 In the previous example:
 
-- The resolver starts with the last group (section "7.2.1"), which contains:
+- The resolver starts with the last group (section "7.3.1"), which contains:
 
 ```text
 of example[text="a mami jefi"]
@@ -1749,14 +1678,14 @@ within entry[form="mami"]
 - the resolver starts with the last `within` clause: it selects all entries matching `entry[form="mami"]`. If no `entry` matches, it raises `NOT_FOUND`. Suppose that four entries have this form.
 - it then moves to the left of that `within` clause, which has a selector containing `sense[category="Noun"]`. It applies this filter to the previously selected entries. Suppose that two of the four entries have a `sense` child with the category "Noun". Two candidate paths remain. Had one entry carried two such senses, that entry would have contributed two candidate paths, not one.
 - the step above is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For each candidate path, we look for an example with the given text under its sense. If exactly one candidate path yields such an example, it is kept. If several candidate paths yield one, an `AMBIGUOUS_REFERENCE` error is raised. If none does, a `NOT_FOUND` error is raised.
-- the group is now resolved to exactly one `example`. **This single component is then handed to the clause at the left of the group, `of field[type="free"]`, which resolves it under the ordinary `of` rule** (section "7.2"): the field is looked up among the children of that one example, it must be selected unambiguously by its own selection strategy, and it raises `NOT_FOUND` or `AMBIGUOUS_REFERENCE` on its own.
+- the group is now resolved to exactly one `example`. **This single component is then handed to the clause at the left of the group, `of field[type="free"]`, which resolves it under the ordinary `of` rule** (section "7.3"): the field is looked up among the children of that one example, it must be selected unambiguously by its own selection strategy, and it raises `NOT_FOUND` or `AMBIGUOUS_REFERENCE` on its own.
 - the same applies in turn to `on annotation[type="semantic domain", value="Animal"]`, resolved among the children of that one `field`. The `update` command is then applied to the `value` property of that one `annotation`.
 
 The general rule is: a `within` chain is resolved as a group and yields exactly
 one component; that component is then an ordinary, uniquely resolved parent for
 everything standing at the left of the group.
 
-#### 7.3.4 Difference between `of` and `within`
+#### 7.4.4 `of` compared with `within`
 
 An `of` clause identifies the immediate parent of the preceding component in a chain of child-parent where each step is uniquely and unambiguously selected.
 
@@ -1775,11 +1704,10 @@ within sense[category = "Noun"]
 within entry[form@tww = "mami"]
 ```
 
-#### 7.3.5 Existential filtering with the selected child
+#### 7.4.5 Filtering by the selected child
 
-When a `within` clause is used, the parent selector is evaluated together with the already selected descendant path.
-
-For example:
+The parent of a `within` clause is evaluated together with the descendant path
+already selected, and not on its own:
 
 ```LiftPatchRef
 create example(
@@ -1789,39 +1717,23 @@ under sense[gloss@en = "pig"]
 within entry[form@tww = "mami"]
 ```
 
-The entry is not selected solely by its form. It must also contain the sense selected by:
-
-```text
-sense[gloss@en = "pig"]
-```
-
-This is useful when several entries have the same form. The `within` clause therefore acts as a existential filtering constraint that filter a set of parents with condition on their descendants:
+The entry is not selected solely by its form: it must also contain the sense
+`sense[gloss@en = "pig"]`, which is what makes the command usable when several
+entries share the form. In set notation, the clause reads:
 
 ```text
 entry[form@tww = "mami"]
   ∋ sense[gloss@en = "pig"]
 ```
 
-The parent selector does not independently select an unrelated sense elsewhere in the dictionary.
+The sense, symmetrically, is looked for among the children of those entries, and
+never elsewhere in the dictionary.
 
-#### 7.3.6 Cardinality
+#### 7.4.6 No implicit creation
 
-The complete constrained path must resolve to exactly one valid target for commands that require one target.
-
-The following errors apply:
-
-- `NOT_FOUND` — no ancestor satisfies the constraint in the `within` chain 
-- `AMBIGUOUS_REFERENCE` — more than one complete ancestor/descendant path satisfies it;
-- `ILLEGAL_PARENT` — the selected components cannot be related according to the component hierarchy;
-- `DUPLICATE_SELECTOR` — the same ancestor constraint is specified more than once or conflicts with another selector strategy.
-
-The ancestor is valid only if exactly one complete matching descendant path exists.
-
-#### 7.3.7 No implicit creation
-
-A `within` clause is always a selector constraint. It never creates an ancestor or any intermediate component.
-
-For example:
+A `within` clause is a selector constraint, and selectors never create (section
+"5.1"). In the following command, neither the entry nor the sense is created; if
+either is absent, the command fails with `NOT_FOUND`:
 
 ```LiftPatchRef
 create note(type = "special", text@en = "Very important")
@@ -1829,37 +1741,19 @@ under sense[gloss@en = "foo"]
 within entry[form@tww = "mami"]
 ```
 
-This command does not create the entry or the sense. If either component is absent, the command fails.
+#### 7.4.7 `within` in a block header
 
-#### 7.3.8 Blocks
+A `within` chain may be used in the header of a block, where it selects the
+parent of the commands in the block body (section "11").
 
-`within` is allowed in the header of a block (see section "11" for the definition of block construct) for selecting the parent targeted by the command(s) in the block body.
-
-#### 7.3.9 Assessment
-
-The `within` clause solves a real problem: selecting a child component while ensuring that its containing entry is the intended homophone entry. It makes a relationship such as:
-
-```text
-entry[form = "mami"] containing sense[gloss = "foo"]
-```
-
-expressible without silently using a child selector to disambiguate an ambiguous entry.
-
-1. Use `of` for an explicit, immediate parent chain.
-2. Use `within` for a parent constraint.
-3. `within` is an existential child constraint: the parent must contain at least one matching descendant.
-4. Resolve the complete constrained path before executing the command.
-5. Never let `within` create missing ancestors.
-6. Multiple matching `within` chains produce `AMBIGUOUS_REFERENCE`.
-
-## 8. Commands operating on components
+## 8. Component commands
 
 ### 8.1 The `create` command
 
 The `create` command always creates a new component and does not reinterpret the
 properties as a component selector.
 
-Properties required for the creation of a component are defined in the "Required at creation" column in the property table in section "4. Lift properties".
+Properties required for the creation of a component are defined in the "Required at creation" column in the property table in section "4.1".
 
 Here are examples of `create` commands that create new components:
 
@@ -1889,7 +1783,7 @@ create sense(gloss@en = "pig")
 ```
 
 The duplicate detection works with the properties enumerated in the table in the
-section "5.2 identity properties". It means that, under the same parent, two
+section "5.2". It means that, under the same parent, two
 senses are identical if they have the same qualified gloss; two examples are
 identical if they have the same qualified text, two variants are identical if
 they have the same type and target.
@@ -1903,7 +1797,7 @@ upsert sense(
 )
 ```
 
-#### 8.1.1 The case of entry
+#### 8.1.1 Creating an `entry`
 
 This is not an exception to the rule above but an instance of it. The natural
 identity property set of `entry` is empty, so the uniqueness invariant of
@@ -1917,20 +1811,11 @@ create entry(form@tww = "mami")
 
 #### 8.1.2 The `at POSITION` clause
 
-The `create` command allows an optional `at POSITION` clause, which specifies
-where to insert the component in the parent's list of same-type components. The
-clause is defined once, for every command that creates a component, in section
-"6.2 The `at` position clause". Allowed positions are:
-
-```text
-at beginning
-at end
-at index <n>
-at before <STEP>
-at after <STEP>
-```
-
-Examples:
+The `create` command takes the optional `at POSITION` clause, which is defined
+once, for every command that creates a component, in section "6.2", together
+with its five positions, its default (`at end`), its errors, and the rules of the
+step used by `at before` / `at after` (section "6.2.1"). Two examples of its use
+with `create`:
 
 ```LiftPatchRef
 create sense(gloss@en = "pig")
@@ -1945,11 +1830,8 @@ create example(text@tww = "a mami jefi")
   at after example[text@tww = "a mami jefo"]
 ```
 
-- The index is 1-based and counts same-type siblings only.
-- The valid insertion range is 1..count+1. If the index given is < 1 or greater than the number of already existing same-type components + 1, an error `INDEX_OUT_OF_BOUNDS` is raised.
-- `at before` / `at after` take a step that must select exactly one same-type sibling under the destination parent; otherwise `NOT_FOUND` or `AMBIGUOUS_REFERENCE` is raised. The rules of that step are given in section "6.2.1".
-- **When the clause is omitted, the component is created at the last position** (`at end`).
-- The clause is **not** available when the created component is an `entry` (sections "2" and "6.2"): `create entry(...) at ...` is a syntax error, since the order of the entry list is the dictionary's and not the script's.
+Nothing about the clause is specific to `create`, except that `create entry(...)`
+does not take it at all (sections "2" and "6.2").
 
 ### 8.2 The `upsert` command
 
@@ -1960,7 +1842,7 @@ upsert sense(gloss@en = "pig")
   under entry[form@tww = "mami", hn=1]
 ```
 
-#### 8.2.1 The two branches of `upsert`
+#### 8.2.1 The two branches
 
 `upsert` is defined by two branches. Exactly one of them runs.
 
@@ -2003,13 +1885,13 @@ upsert sense(
 under entry[form@tww = "mami"]
 ```
 
-#### 8.2.2 `id` and `upsert`
+#### 8.2.2 `id` is not admitted
 
 `upsert` cannot use an `id`, since an `id` cannot be set and a component that
 does not exist yet has none. Using an `id` in an `upsert` parenthesis fails with
 the error `ID_NOT_ALLOWED_ON_UPSERT`.
 
-#### 8.2.3 `upsert` on an `entry`
+#### 8.2.3 Upserting an `entry`
 
 `entry` has an empty natural identity property set, so the match part `K` of an
 `upsert` on an entry is empty and the resolution of section "8.2.1" would match
@@ -2045,11 +1927,12 @@ ensure sense[gloss@en = "pig"]
 ensure entry[form@tww = "mami", has-gloss@en = "pig"]
 ```
 
-- If the selector matches no component, `NOT_FOUND` is raised.
-- If it matches more than one, `AMBIGUOUS_REFERENCE` is raised.
-- If it matches exactly one, the command succeeds and the dictionary is unchanged.
-- `ensure` accepts every selection strategy, including `id`, `hn`, `has` / `has-gloss` and the ordinal `#n`. It may target any component type, `entry` included: since `ensure` does not create, the fact that `entry` has an empty natural identity property set is irrelevant to it.
-- `ensure` takes no `at` clause and binds no label.
+The ordinary selector errors apply, and nothing else: `NOT_FOUND` when nothing
+matches, `AMBIGUOUS_REFERENCE` when several do, success and no change when
+exactly one does (section "5.1.5"). Two points are specific to `ensure`:
+
+- it accepts every selection strategy, including `id`, `hn`, `has` / `has-gloss` and the ordinal `#n`, and it may target any component type, `entry` included: since it does not create, the empty natural identity property set of `entry` is irrelevant to it;
+- it takes no `at` clause and binds no label.
 
 Writing `ensure sense(gloss@en = "pig")` — with parentheses — is a **syntax
 error**. Earlier drafts described `ensure` as "an idempotent upsert that does not
@@ -2099,23 +1982,12 @@ descendants. Matching none still raises `NOT_FOUND`.
 
 ### 8.5 The `move` command
 
-The `at POSITION` clause is **mandatory** on `move`: a move with no stated
-destination position would have no defined meaning, and `move` is the one
-command with no sensible default (appending at the end is a real change of
+The `at POSITION` clause of section "6.2" is **mandatory** on `move`: a move with
+no stated destination position would have no defined meaning, and `move` is the
+one command with no sensible default (appending at the end is a real change of
 order, not a neutral choice). A `move` without an `at` clause is a syntax error.
-
-Allowed positions are those of section "6.2":
-
-```text
-at beginning
-at end
-at index <n>
-at before <STEP>
-at after <STEP>
-```
-
-- The index is 1-based and counts same-type siblings only.
-- `at before` / `at after` are RECOMMENDED over `at index <n>`, since they do not depend on the current length of the sibling list:
+The five positions and the rules of the `at before` / `at after` step are those
+of sections "6.2" and "6.2.1":
 
 ```LiftPatchRef
 move example#3
@@ -2168,20 +2040,16 @@ rejected by the parser as a syntax error, since `entry` has no parent and no
 sibling order to change. The code `ENTRY_CANNOT_MOVE` used by earlier drafts is
 withdrawn.
 
-A move also fails if:
+A move also fails if it would break the uniqueness invariant of section "5.2"
+under the destination parent: `CANNOT_CREATE_DUPLICATE`.
 
-- the move will create a duplicate amongst the sibling set according to natural identity properties. The validation must iterate on pre-existing siblings and check that none has the same values as the new candidate sibling for the identity properties of this type of component. If a duplicate would be created, an error 'CANNOT_CREATE_DUPLICATE' must be raised. For multitext natural identity property, it means iterating on the relevant language set languages and check that, for the multitext having a value set for this language, there is no duplicate.
-
-The selectors will raise an exception if:
-
-- the source does not exist;
-- the destination does not exist.
-
-The source and destination are resolved before the move is applied.
+The source and destination are resolved before the move is applied, and either
+raises `NOT_FOUND` or `AMBIGUOUS_REFERENCE` on its own if it does not designate
+exactly one component.
 
 Moving changes position and parentage, never identity.
 
-## 9. Commands operating on properties
+## 9. Property commands
 
 ### 9.1 The `set` command
 
@@ -2226,7 +2094,7 @@ The previous command will set the value of the qualified value `definition@en`,
 it will not change any other qualified value existing on that property (say,
 `definition@fr`).
 
-If the `set` command targets one of the natural identity properties of the component, the validation must iterate on siblings and check that none has the same values as the new candidate sibling for the identity properties of this type of component. If a duplicate would be created, an error `CANNOT_CREATE_DUPLICATE` must be raised. When the targeted natural identity property is a multitext, it means to check the values qualified with the same languages on the other sibling components.
+When `set` targets a natural identity property, the uniqueness invariant of section "5.2" is checked against the other same-type siblings before the value is written, and `CANNOT_CREATE_DUPLICATE` is raised if the command would break it.
 
 `set` accepts the multiplicity keyword `each` on its `on` clause (section
 "5.6"), and a multi-language literal as its value (section "5.5.1"):
@@ -2245,7 +2113,7 @@ string to "all languages" is not a meaningful operation. `@*` is a reading and a
 removing qualifier, not an assigning one (section "4.4.1"); to assign several
 languages in one command, use a multi-language literal.
 
-#### 9.1.1 Assigning several properties in one command
+#### 9.1.1 Assignment lists
 
 A property command may carry an **assignment list**, so that the properties of
 one component are written in one command instead of one command per property:
@@ -2320,11 +2188,9 @@ update definition =
   of entry[form@tww = "mami"]
 ```
 
-If the `update` command target one of the natural identity properties of the component, the validation must iterate on siblings and check that none has the same values than the new candidate sibling for the identity properties of this type of component. If a duplicate would be created, an error 'CANNOT_CREATE_DUPLICATE' must be raised. When the targeted natural identity property is a multitext, it means to check the values qualified with the same languages on the other sibling components.
+`update` checks the uniqueness invariant exactly as `set` does (sections "5.2" and "9.1").
 
 ### 9.3 The `clear` command
-
-#### Clear for non-identity properties
 
 `clear` removes property values while retaining the parent component:
 
@@ -2343,17 +2209,14 @@ clear definition@*
   of entry[form@tww = "mami"]
 ```
 
-`clear` is the only command that may intentionally target multiple
-qualified property values. Component selectors and `set`/`update` targets must
-resolve to exactly one qualified value. A `@*` `clear` may then remove
-several matching values, however it never removes the parent component.
+`clear` is the only command that may intentionally target multiple qualified
+property values: component selectors and `set` / `update` targets must resolve to
+exactly one. A `@*` `clear` may remove several values, but it never removes the
+parent component.
 
-On a multitext property the qualifier is mandatory: `clear definition` — with
-neither a language nor `@*` — raises `MISSING_LANGUAGE_QUALIFIER`. The default
-language is never applied by `clear`, because there is nothing to default.
-
-`clear` on scalar properties removes the property value, and takes no
-qualifier:
+The qualifier rules — mandatory on a multitext, forbidden on a scalar, never
+defaulted — are those of section "5.5.3". On a scalar property, `clear` removes
+the value and takes no qualifier:
 
 ```LiftPatchRef
 clear category
@@ -2369,7 +2232,7 @@ clear definition@fr
   of entry[form@tww = "mami"]
 ```
 
-#### 9.3.1 Decision table for `clear`
+#### 9.3.1 Decision table
 
 The following table is normative and exhaustive. It gives, for every
 combination of property role (section "5.4.1"), qualifier, and current state of
@@ -2404,68 +2267,33 @@ The codes `QUALIFIED_PROPERTY_NOT_FOUND` and `EMPTY_MULTITEXT` used by earlier
 drafts are withdrawn; `UNSET_QUALIFIED_PROPERTY` and `UNSET_PROPERTY`
 respectively replace them.
 
-#### Clear for identity and required scalar properties
+#### 9.3.2 The table applied to real properties
 
-A scalar property that belongs to the natural identity property set of the
-component cannot be cleared (`CANNOT_CLEAR_IDENTITY_PROPERTY`), and neither can
-a scalar property that the metamodel declares required
-(`CANNOT_CLEAR_REQUIRED_PROPERTY`). Optional scalar properties can be cleared.
+The three cases a lexicographer meets most often, each naming the row of section
+"9.3.1" that decides it:
 
-For instance `Illustration.url` is both required and the identity property of
-`illustration`: `clear url on illustration[...]` is always refused. `Trait.value`
-is required and not an identity property: `clear value on trait[...]` is refused
-too. `Sense.category` is optional: it can be cleared.
+| Command | Property role | Outcome |
+|---|---|---|
+| `clear url on illustration[...]` | `Illustration.url`: scalar, required, identity (R1) | `CANNOT_CLEAR_IDENTITY_PROPERTY` |
+| `clear value on trait[...]` | `Trait.value`: scalar, required, non-identity (R3) | `CANNOT_CLEAR_REQUIRED_PROPERTY` |
+| `clear category on sense[...]` | `Sense.category`: scalar, optional (R5) | the value is removed, or `UNSET_PROPERTY` if it was already unset |
 
-#### Clear for required multitext properties
-
-The `clear` command can also be used on a required property.
-
-In the case of a required multitext property, clear cannot remove the last
-value. A qualified value of a required multitext property may be cleared if at
-least one qualified value remains; the complete property may not be cleared. It
-means that:
-
-1/ the following command will raise a `CANNOT_CLEAR_REQUIRED_MULTITEXT` error if the `tww` form
-is the only sub-entry: 
+And the same for a required multitext, `Entry.form` (R4), where the outcome
+depends on what remains:
 
 ```text
 clear form@tww
   on entry[form@tww = "mami"]
 ```
 
-It will successfully remove the value for the `tww` form if there is also a form
-in another language.
+removes the `tww` value if the entry also has a form in another language, and
+raises `CANNOT_CLEAR_REQUIRED_MULTITEXT` if `tww` is the only one. Written
+`clear form@*` it raises `CANNOT_CLEAR_REQUIRED_MULTITEXT` whatever the state,
+since it would empty a required property; written `clear form`, with no
+qualifier, it raises `MISSING_LANGUAGE_QUALIFIER` before the state is consulted
+at all.
 
-2/ with a multitext property that is required on a component, the clear
-command cannot be used with the `@*` wildcard, as it would remove the value for
-all languages and leave the multitext property empty. The following two commands
-raise `CANNOT_CLEAR_REQUIRED_MULTITEXT`:
-
-```text
-clear form@*
-  on entry[form@tww = "mami"]
-```
-
-and:
-
-```text
-clear gloss@*
-  on sense[gloss@en = "pig"]
-  of entry[form@tww = "mami"]
-```
-
-3/ written with no qualifier at all, both commands raise
-`MISSING_LANGUAGE_QUALIFIER` instead:
-
-```text
-clear form
-  on entry[form@tww = "mami"]
-```
-
-It means that the `clear` command never uses the implicit language: on a
-multitext, the qualifier must always be written.
-
-## 10. References to other components
+## 10. Reference properties
 
 Properties of datatype "reference" store the id of the referenced component.
 
@@ -2523,22 +2351,18 @@ Two consequences are worth stating:
 - selecting by a dangling reference is not expressible, and does not need to be: if the referenced component has been deleted, no chain denotes it. To find such components, an implementation's plan mode reports them (section "12.4");
 - the chain in a selector is resolved against the state of the dictionary left by the preceding commands of the script (section "12.1"), like every other selector.
 
-The validator further verifies that:
+When a reference is **assigned**, the validator further verifies that:
 
-- the target of a `reference` property is an entry or a sense; otherwise `INVALID_TARGET` is raised;
-- the stored value of a reference resolves to an existing component when it is *assigned*; `NO_SUCH_TARGET` is raised if it does not;
-- no two identical `Relation`, `Variant` or `Reversal` components exist on the same parent component (i.e. with the same type and the same target).
+- the value resolves to an existing component; otherwise `NO_SUCH_TARGET` is raised;
+- that component is an entry or a sense; otherwise `INVALID_TARGET` is raised.
 
-These rules regarding reference apply to every target property on:
+These rules apply to the `target` property of the three component types that
+carry one: `variant`, `relation` and `reversal`. Since `type + target` is the
+natural identity of all three, two of them with the same type and the same target
+under one parent are duplicates, refused by the invariant of section "5.2" with
+`CANNOT_CREATE_DUPLICATE`; nothing specific to references is involved.
 
-- variants;
-- relations;
-- reversals.
-
-When an identical component with the same type and the same target already exists,
-the creation of a Variant, Relation, or Reversal component should fail with 'CANNOT_CREATE_DUPLICATE'.
-
-## 11. Block construct
+## 11. Blocks
 
 Blocks provide convenient construct for related operations while preserving explicit component construction.
 
@@ -2621,8 +2445,9 @@ The preceding command is very useful if the user want to create a new entry only
 
 This semantic of two embedded upsert cannot be expressed without the block syntax.
 
-- As stated above, an `upsert`, `ensure` or `update` cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related.
-- For instance, in the following command, an upsert command is illegally in the scope of a `create` command at the direct upper level -- expecting that a sense exist on a newly created entry make no sense --:
+The restriction stated above — no `upsert`, `ensure` or `update` in the scope of
+a `create` — is what forbids the following command: expecting a sense to exist
+on an entry the same command has just created makes no sense.
 
 ```
 create entry(form@tww = "mami") {
@@ -2811,7 +2636,7 @@ Plan mode is what makes a mutation language over irreplaceable linguistic data
 reviewable before the fact, and it gives implementations a directly comparable
 artifact to test against.
 
-# Part 3. The *LiftPatchShort* LiftPatch Concise surface syntax
+# Part 3. The LiftPatchShort concise syntax
 
 This section describes an alternate concise syntax for practical purposes, LiftPatchShort.
 
@@ -2860,10 +2685,6 @@ whitespace, it matches one of the following:
    - `/` — a path (`c /mami`, `d /e[f="mami"]/s[g="pig"]`), or
    - `$` — a label (`s $pig (c = "Noun")`), or
    - a component letter (or component name) immediately followed by `(` — a constructor with no parent path, which only `c` and `p` accept (`c e("mami")`, `p entry(f="mami", has-gloss="pig")`).
-
-Every command of the concise syntax has a second token of one of these three
-shapes: `c` and `p` take either a path or a constructor, and `d`, `e`, `m`, `s`,
-`u` and `l` always take a path, which begins with `/` or with a label.
 2. `language-default ` or `language-create ` followed by `object` or `meta`:
 
 ```
@@ -2874,6 +2695,10 @@ language-create meta = "fr"
 ```
 
 3. the version pragma `%liftpatch 1.0`, on the first non-blank line of the document.
+
+Every command has a second token of one of the three shapes of rule 1: `c` and
+`p` take either a path or a constructor, and `d`, `e`, `m`, `s`, `u` and `l`
+always take a path, which begins with `/` or with a label.
 
 The command letters are:
 
@@ -2917,25 +2742,23 @@ Comments are not required in a mixed document, where prose lines already
 surround the commands; they are available for annotating a command on its own
 line.
 
-For reliable extraction from ordinary prose, commands MUST begin at the
-beginning of the line or be separated from the beginning of the line only by whitespace. A command
-continues until the end of that physical line.
+A command continues until the end of its physical line: the concise syntax has
+no multiline command, and a long or complex operation must be written in
+LiftPatchRef.
 
-The concise syntax does not support multiline commands. A long or complex operation must use the reference language instead.
-
-### 1.2 What the concise syntax does not express
+### 1.2 Constructs with no concise form
 
 The concise syntax is a subset. The following constructs of the reference syntax
 have no concise form, and a script that needs them must be written in
 LiftPatchRef:
 
-- the strict-parent axis on a link that is not immediately above the command target (section "4. Path specification");
+- the strict-parent axis on a link that is not immediately above the command target (section "4");
 - `hn` selection;
 - explicit blocks and nested transactions (embedded initializers cover the common case, section "7");
 - `with` language scoping;
 - an `at` clause on an embedded initializer (section "7").
 
-## 2. Single-letter designations of commands, components and properties
+## 2. Short codes
 
 In concise syntax, commands, components, and properties are designated by a single-letter code. The semantics, however, remain exactly the same.
 
@@ -2963,7 +2786,7 @@ when it is immediately followed by `[`, `#` or `(`; a path step written
 `/entry`, with nothing after it, is the bare entry form `"entry"`, exactly as
 `/e` is the bare entry form `"e"` (section "6.1").
 
-### 2.1. Command short codes
+### 2.1 Command codes
 
 The commands are the same as in the LIFT-DSL language. They are represented by a single letter, called a "short code", in the following table:
 
@@ -2995,7 +2818,7 @@ s* /e[f="mami"]/s[g="pig"] (c = "Noun")
 - `*` is allowed only on `d`, `s`, `u` and `l`, that is on `delete`, `set`, `update` and `clear`. On `c`, `p`, `m` and `e` it raises `MULTIPLICITY_NOT_ALLOWED`.
 - It marks the target step of the command — the last step of the path for `d`, the last step of the path for the property commands — exactly as `all` / `each` do in the reference syntax, with the same rules and the same errors.
 
-### 2.2. Component short codes
+### 2.2 Component codes
 
 The components are the same as in the LIFT-DSL language. They are referred to by a single letter.  The letters are:
 
@@ -3017,7 +2840,7 @@ The components are the same as in the LIFT-DSL language. They are referred to by
 | Field | `f` |
 | Translation | `o` |
 
-### 2.3. Properties short codes
+### 2.3 Property codes
 
 The properties on components are the same as in LIFT-DSL language, they are referred to with a single letter code:
 
@@ -3092,7 +2915,7 @@ at once, use `p /mami/pig` (section "8") or an embedded initializer (section
 ```
 p <parent_path> <component_type>(<initializers>) [at <position>] [as $<label>]
 p e(<initializers>) [as $<label>]   # for entry
-p <path>                                            # see section 8
+p <path>                                            # see section "8"
 ```
 
 **Upserting an entry needs a disambiguation predicate.** `upsert` on an entry is
@@ -3178,11 +3001,10 @@ s /mami/pig (c = "Noun", d@en = "A four-legged terrestrial animal")
 l /mami/pig (c, d@*)
 ```
 
-Four rules of the reference syntax apply unchanged to the parenthesized part:
+Three rules of the reference syntax apply unchanged to the parenthesized part:
 
-- On a multitext property, `clear` requires an explicit qualifier, a language code or `@*`: `l /mami/pig (d@en)` clears one language, `l /mami/pig (d@*)` clears them all, and `l /mami/pig (d)` raises `MISSING_LANGUAGE_QUALIFIER`. On a scalar property no qualifier is written: `l /mami/pig (c)`.
+- The language qualifier is written as in the reference syntax, and `clear` requires an explicit one on a multitext (Part 1, section "5.5.3"; concise examples in section "5.6").
 - A multi-language literal is written as in the reference syntax: `s /mami (f = { tww: "mami", tpi: "pik" })`.
-- Naming the same qualified property twice in one list raises `DUPLICATE_PROPERTY`.
 - A property of datatype `reference` takes a **path** as its value, never a bare string:
 
 ```LiftPatchShort
@@ -3208,39 +3030,10 @@ c e("mami") as $new
 c /memi r(y="synonym", a = $new)
 ```
 
-Example:
+Section "5" takes each of the eight commands in turn, with an example and its
+translation into the reference syntax.
 
-1/ Create a sense with gloss "pig" (in default meta language) under the existing entry with form "mami" (in default object language):
-
-```LiftPatchShort
-c /e[f="mami"] s(g="pig") 
-```
-
-2/ Delete an existing sense with gloss "pig" (in default meta language) under the existing entry  with form "mami" (in default object language):
-
-```LiftPatchShort
-d /e[f="mami"]/s[g="pig"]
-```
-
-3/ Update the property "category" of a sense:
-
-```LiftPatchShort
-u /e[f="mami"]/s[g="pig"] (c = "Verb")
-```
-
-4/ Clear the property "category" of a sense:
-
-```LiftPatchShort
-l /e[f="mami"]/s[g="pig"] (c)
-```
-
-5/ Set the property "category" of a sense:
-
-```LiftPatchShort
-s /e[f="mami"]/s[g="pig"] (c = "Noun")
-```
-
-## 4 Path specification
+## 4. Paths
 
 A path starts with a slash and is a sequence of slash-separated steps.
 
@@ -3298,7 +3091,7 @@ within  e[f="mami"]
 
 Because the steps above the target are linked by the existential axis, the sense
 is selected out of the set of entries with a form "mami", by the existential
-join described in Part 1, section "7.3": the whole path must resolve to exactly
+join described in Part 1, section "7.4": the whole path must resolve to exactly
 one component, and it raises `AMBIGUOUS_REFERENCE` when it does not.
 
 And with a `create` command, where the path selects a sense and the initializers create an example under it:
@@ -3338,7 +3131,7 @@ delete example#1
 - As in the reference syntax, an ordinal cannot occur together with any predicate in the same step: `x[1]` and `x#1` carry the ordinal and nothing else, and `x[g="pig"]#1` is a syntax error.
 - The `#n` form is RECOMMENDED, since it is the form used by the reference syntax; the `[n]` form is kept for concision.
 
-### 4.3 Predicates inside a step
+### 4.3 Predicates in a step
 
 The predicates of the reference syntax (Part 1, section "5.1.2") are available
 unchanged in the concise syntax; only the property name is abbreviated. The
@@ -3379,9 +3172,9 @@ delete all example[text ~i "^draft"]
   within entry[form@tww ~ "^mam"]
 ```
 
-## 5. Command syntax details
+## 5. The commands one by one
 
-### 5.1 Create, upsert, ensure: commands with initializers
+### 5.1 Create, upsert and ensure
 
 Commands with initializer are identical to the initializer + `under` in the reference language.
 
@@ -3389,7 +3182,7 @@ Commands with initializer are identical to the initializer + `under` in the refe
 c /e[f="mami"] s(g="pig")
 ```
 
-This translates into
+This translates into:
 
 ```
 create sense(gloss="pig") under
@@ -3402,7 +3195,7 @@ As in the reference language:
 
 - ensure (e) takes no initializer at all: it is an assertion and its component is designated by the last step of a path (section "3")
 - upsert (p) requires all identity properties
-- the `at <position>` clause is optional on `c` and `p`, and when it is omitted the component is created at the last position, exactly as with `at end` (Part 1, section "6.2"); it is forbidden on `e`, which has no position, and on any command creating an `entry`, whose list is ordered by the dictionary (Part 1, section "2") — `c e("mami") at beginning` is a syntax error.
+- the `at <position>` clause behaves as in Part 1, section "6.2": optional on `c` and `p`, defaulting to `at end`, forbidden on `e` and on any command creating an `entry` (`c e("mami") at beginning` is a syntax error).
 - an `as $<label>` binding may close a `c` or `p` command line (section "3")
 - a multitext initializer may take a multi-language literal, written as in the reference syntax
 - The initializer initializes the property or properties that are required for the creation of a component in the reference syntax. If two properties are required, they are separated by a comma:
@@ -3411,7 +3204,7 @@ As in the reference language:
 c /e[f="mami"]/s[g="pig"] n(y="sociolinguistics", t="my note")
 ```
 
-Translate into:
+It translates into:
 
 ```
 create note(type="sociolinguistics", text="my note")
@@ -3442,7 +3235,7 @@ This command:
 d /e[f="mami"]/s[g="pig"]
 ```
 
-This translate into:
+This translates into:
 
 ```LiftPatchRef
 delete sense[gloss="pig"] under
@@ -3455,7 +3248,7 @@ This command:
 d /e[f="mami"]/s[g="pig"]/x[t="a mami jefi"]
 ```
 
-This translate into:
+This translates into:
 
 ```LiftPatchRef
 delete example[text="a mami jefi"]
@@ -3472,7 +3265,7 @@ example–sense — is the strict axis, and every link above it is existential.
 m /e[f="mami"]/s[g="pig"] at index 1
 ```
 
-Translate in:
+It translates into:
 
 ```LiftPatchRef
 move sense[gloss="pig"]
@@ -3499,18 +3292,9 @@ move example#1
   at end
 ```
 
-The five positions of the reference syntax (Part 1, section "6.2") are all
-available, with exactly the same semantics:
-
-```text
-at beginning
-at end
-at index <n>
-at before <STEP>
-at after <STEP>
-```
-
-`STEP` is an ordinary concise step — a component letter (or component name) with a predicate or an
+The five positions of the reference syntax (Part 1, sections "6.2" and "6.2.1")
+are all available, with exactly the same semantics. `STEP` is an ordinary
+concise step — a component letter (or component name) with a predicate or an
 ordinal — and it must select exactly one same-type sibling of the destination
 parent:
 
@@ -3627,9 +3411,9 @@ values rather than addressing one. The decision table of Part 2, section
 "9.3.1", governs which of these commands succeeds and which error each refused
 case raises.
 
-## 6. Simplified path and initializers
+## 6. Abbreviations
 
-### 6.1 Dropping component name and property name for entry's `form` and sense's `gloss` in path
+### 6.1 Abbreviated path steps
 
 1/ If the first step of a path is a single string between single or double quotes, then it is the form of an entry:
 
@@ -3745,7 +3529,7 @@ on the same lexical decision:
 - a bare word is never a component name: `/e` is the entry whose form is `"e"`, and only `/e[…]`, `/e#n` and `/e(…)` designate the `entry` component type (section "2");
 - a comment starts at an unquoted `#` preceded by whitespace, so a bare word never contains one (section "1.1").
 
-### 6.2 Dropping property name in initializer
+### 6.2 Unnamed initializer arguments
 
 The following initializers can drop the property name under the following conditions:
 
@@ -3769,7 +3553,7 @@ i.e., in reference syntax:
 create entry(form="mami")
 ```
 
-#### 6.2.2 `Sense`
+#### 6.2.2 `sense`
 
 If a `sense` initializer has no field name and equal sign before the assigned string, then it is the sense gloss:
 
@@ -3792,7 +3576,7 @@ upsert sense(gloss="pig")
 under entry[form="mami"]
 ```
 
-#### 6.2.3 `Example`
+#### 6.2.3 `example`
 
 If an `example` initializer has a string without property name it is the example text.
 
@@ -3817,7 +3601,7 @@ create example(text="a mami jefi")
 
 ```
 
-#### 6.2.4. Default argument for other initializer
+#### 6.2.4 The other component types
 
 The following table shows how many unnamed string arguments are allowed for the
 initializers of the different component type, and to which properties they map.
@@ -3868,7 +3652,7 @@ c /mami p("mami")
 c /mami/pig i("http://www.example.org/pig.png")
 ```
 
-### 6.3 Specifying language code when the property name is dropped
+### 6.3 Language qualifiers on abbreviated values
 
 In the two preceding sections, 6.1 and 6.2, new constructions were introduced where the property name is dropped.
 
@@ -3908,7 +3692,7 @@ c e("mami"@tww)
 c /"mami"/"Schwein"@de x("a mami jefi"@tww)
 ```
 
-## 7. Embedding initializer
+## 7. Embedded initializers
 
 An embedded component creation is allowed *into* a component initializer for creating a child on the fly.
 
@@ -3941,7 +3725,7 @@ Embedded creation rules also include:
 c /mami/pig x(t = { tww: "a mami jefi", tpi: "mi shutim pik" }) at beginning
 ```
 
-## 8. An idiomatic construct
+## 8. The `p /form/gloss` idiom
 
 An last and idiomatic construct is an `upsert` command, *followed by a path that contain only an entry (with a form) and a sense (with a gloss)*, and *without the expected constructor*:
 
@@ -3987,7 +3771,7 @@ exist, and it will fail if the `sense` already exist. On the contrary, the
 `upsert` construct will not fail if the entry+sense exist, and it will create the `sense` on a different (new) `entry` if it does not, not adding the `sense`
 on an existing `entry`.
 
-## 9. A final example
+## 9. A worked example
 
 Using implicit field name and embedded initializers, consider the following
 command, that uses many of the rules previously stated:
