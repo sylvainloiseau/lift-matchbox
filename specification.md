@@ -518,34 +518,34 @@ A *chain* links a step to its ancestors through an *axis*:
 
 ```text
 CHAIN ::= STEP { AXIS STEP }
-AXIS  ::= '/'    (written `of` / `under` / `on` in LiftPatchRef, where it is
-                  always the strict-parent axis; written `/` in LiftPatchShort,
-                  where which axis it denotes depends on its position in the
-                  path — see Part 3, section "4.1")
-        | '//'   (existential parent, always; also written `within`)
+AXIS  ::= '!'    (strict parent, always; also written `of` / `under` / `on`)
+        | '/'    (existential parent, always; also written `within`)
 ```
 
-There are exactly **two axes**, and each has a keyword spelling used in Part 2 and
-an operator spelling used in Part 3:
+There are exactly **two axes**, each has exactly one keyword spelling used in
+Part 2 and exactly one operator spelling used in Part 3, and neither spelling
+depends on where the link stands:
 
 | Axis | Keyword spelling (Part 2) | Operator spelling (Part 3) | Semantics |
 |---|---|---|---|
-| strict parent | `of` / `under` / `on` | `/` | section "7.3" |
-| existential parent | `within` | `//` | section "7.4" |
+| strict parent | `of` / `under` / `on` | `!` | section "7.3" |
+| existential parent | `within` | `/` | section "7.4" |
 
-The keyword and operator spellings may not be mixed inside one chain. Two
-clarifications:
+The keyword and operator spellings may not be mixed inside one chain. A leading
+`/` in LiftPatchShort is not an axis but the **root marker** of an absolute path
+(Part 3, section "4"), and the strict link that joins a command's parent path to
+its direct target is not written at all: it is the whitespace between the two
+(Part 3, section "4.1"). One clarification:
 
-- **`//` is always the existential axis. `/` is not always the strict one.** In LiftPatchRef, where the axis is written with a keyword, `of` / `under` / `on` is always strict and `within` always existential. In LiftPatchShort, the separator `/` denotes a link whose axis is fixed by its **position** in the path — strict immediately above the command target, existential everywhere else — under the positional rule of Part 3, section "4.1". `//` forces the existential axis where that rule would make the link strict.
 - **The two syntaxes write chains in opposite directions.** A LiftPatchRef chain is written *child first, ancestors after*: `sense[gloss@en = "pig"] of entry[form@tww = "mami"]` names the sense, then its parent. A LiftPatchShort path is written *ancestor first, descendants after*: `/e[f="mami"]/s[g="pig"]` names the entry, then its child. The two are the same chain. Whenever this document says "the step to the left" or "the step that follows", it is speaking of one syntax only, and says which; the syntax-independent formulation is "the parent step" and "the child step".
 
 We distinguish:
 
 - *unique selector* (or *unique selection*): a selector that must match exactly one component. There are two sub-kinds:
-  - a *parent selector*: the selector of a component named as the parent of another, in an `of`, `under`, `on` or `within` clause (in Part 3: the parent side of a `/` or `//` link);
-  - a *command selector*: the selector of the component directly targeted by a `delete`, `ensure`, `move` or `set`/`update`/`clear` command, or by the select branch of an `upsert` command; the step of an `at before` / `at after` clause is also one (section "6.2.1");
+  - a *parent selector*: the selector of a component named as the parent of another, in an `of`, `under`, `on` or `within` clause. In Part 3 a parent selector is a step of a command's *parent path*, and it is a unique selector exactly when its **child** link is the strict axis — that is, when the link to its child step is written `!`, or when it is the last step of the parent path, whose link to the direct target is strict and unwritten (Part 3, section "4.1");
+  - a *command selector*: the selector of the component directly targeted by a `delete`, `ensure`, `move` or `set`/`update`/`clear` command, or by the select branch of an `upsert` command; the step of an `at before` / `at after` clause is also one (section "6.2.1"); in Part 3, the *direct-target step* that `d`, `e` and the source of `m` write after their parent path is a command selector (Part 3, section "4.1");
 - a *filtering selector*: a selector that is not required to select a single component by itself. There are exactly three cases, and this list is exhaustive:
-  - the selector of a component on the **parent** side of a `within` / `//` axis;
+  - the selector of a component on the **parent** side of a `within` / `/` axis;
   - a step inside a `has` predicate;
   - the target step of a command carrying a multiplicity keyword — `each`, `all`, or `*` in LiftPatchShort (section "5.6").
 
@@ -602,13 +602,13 @@ is:
 
 The predicates restricted to filtering selectors are excluded from unique
 selection because they are, by construction, not uniquely identifying; using one
-of them in a command selector or in a `/` (`of`/`under`/`on`) parent selector
-raises `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`.
+of them in a command selector or in a strict (`of`/`under`/`on`, `!`) parent
+selector raises `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`.
 
 #### 5.1.3 Selection strategies for unique selection
 
-A command selector, and a parent selector on the `/` axis, are *unique selector*
-: it must select exactly one component. To make this checkable statically, such
+A command selector, and a parent selector on the strict axis, are *unique
+selector*: it must select exactly one component. To make this checkable statically, such
 a selector MUST use exactly one of the following *selection strategies*. This
 list is exhaustive.
 
@@ -661,7 +661,7 @@ refined by one, on a component type that is not an `entry`.
 #### 5.1.4 Filtering selectors
 
 A filtering selector — one of the three cases listed in section "5.1.1": the
-parent side of a `within` / `//` link, a step inside a `has` predicate, or a
+parent side of a `within` / `/` link, a step inside a `has` predicate, or a
 target step marked `each` / `all` / `*` — may contain:
 
 - any property allowed on the component type, be it an identity property or not, in any number, with any of the predicate forms of section "5.1.2", and, on a multitext, any number of qualified values and the wildcard `@*`;
@@ -801,7 +801,7 @@ present after initialization.
 Here is a normative summary of the id rule:
 
 - The `id` cannot be set, deleted, initialized during creation, or cleared.
-- The `id` can be used as a lookup predicate in a command selector and in a parent selector on the `/` axis (in `of`, `under`, `on`); it is forbidden in a filtering selector (`within`, `has`).
+- The `id` can be used as a lookup predicate in a command selector and in a parent selector on the strict axis (`of`, `under`, `on`, `!`); it is forbidden in a filtering selector (`within`, `has`).
 - The `id` can be used as a lookup predicate with the `move` and `delete` commands.
 - The `id` is the only way to designate a component by a value that the script did not itself choose; a component created by the running script is designated by a label instead (section "6.3").
 
@@ -1061,7 +1061,7 @@ written beside another one; that combination is not a syntax error but a
 - The ordinal counts **same-type siblings only**: `example#2` is the second `example` child of its parent, whatever other children the parent may have.
 - The ordinal starts at 1.
 - The ordinal can be used with any component type except `entry`.
-- The ordinal is not a property: it cannot be set by any initializer, cannot be the target of `set`, `update` or `clear`, cannot appear in a `create` initializer list, and is forbidden with `upsert` (a component that does not exist yet has no position). It can be used in the command selector of `delete`, `move` and `ensure`, and in a parent selector on the `/` axis.
+- The ordinal is not a property: it cannot be set by any initializer, cannot be the target of `set`, `update` or `clear`, cannot appear in a `create` initializer list, and is forbidden with `upsert` (a component that does not exist yet has no position). It can be used in the command selector of `delete`, `move` and `ensure`, and in a parent selector on the strict axis.
 - The ordinal is forbidden in a filtering selector (`within`, `has`): `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`.
 - If the ordinal is lower than 1, `ILLEGAL_ORDINAL` is raised (static error). If it is greater than the number of same-type siblings, `INDEX_OUT_OF_BOUNDS` is raised (dynamic error).
 - Ordinals are re-evaluated for each command, against the state of the dictionary left by the preceding commands. Two consecutive `delete example#1` under the same parent therefore delete two different components.
@@ -1104,7 +1104,7 @@ at creation`, and `Datatype`. The six roles below form a partition: each
 (component, property) pair matches exactly one row, so the table yields a single
 verdict.
 
-| Role | `create` initializer | `upsert` initializer | unique selector (the column of section "5.4.2": command selectors, including a property command's `on` step, and parent selectors on the `/` axis) | filtering selector (parent side of `within` / `//`, inside `has`, or a step marked `each` / `all` / `*`) | `set` | `update` | `clear` |
+| Role | `create` initializer | `upsert` initializer | unique selector (the column of section "5.4.2": command selectors, including a property command's `on` step, and parent selectors on the `!` axis) | filtering selector (parent side of `within` / `/`, inside `has`, or a step marked `each` / `all` / `*`) | `set` | `update` | `clear` |
 |---|---|---|---|---|---|---|---|
 | **R1** identity, scalar | required | required | required (part of strategy S3) | allowed | allowed, subject to the uniqueness invariant | allowed, subject to the uniqueness invariant | forbidden — `CANNOT_CLEAR_IDENTITY_PROPERTY` |
 | **R2** identity, multitext | required, at least one qualified value | required, at least one qualified value | required (part of strategy S3), exactly one qualified value | allowed, any number of qualified values, `@*` allowed | exactly one qualified value, subject to the uniqueness invariant | exactly one qualified value, subject to the uniqueness invariant | `@L` only, and only if another qualified value remains; `@*` forbidden |
@@ -1129,7 +1129,7 @@ while the last column governs only the *property* a property command writes. The
 two have opposite verdicts — `set form = … on entry[id = "entry-42"]` is legal,
 `set id = …` is not.
 
-| | `create` initializer | `upsert` parenthesis | unique selector — the command selector of `ensure`, `delete`, `move` and of a property command's `on` step, the select branch of `upsert`, the step of `at before` / `at after`, and any parent selector on the `/` axis | filtering selector — parent side of `within` / `//`, inside `has`, or a step marked `each` / `all` / `*` | as the property **written** by `set` / `update` / `clear` |
+| | `create` initializer | `upsert` parenthesis | unique selector — the command selector of `ensure`, `delete`, `move` and of a property command's `on` step, the select branch of `upsert`, the step of `at before` / `at after`, and any parent selector on the `!` axis | filtering selector — parent side of `within` / `/`, inside `has`, or a step marked `each` / `all` / `*` | as the property **written** by `set` / `update` / `clear` |
 |---|---|---|---|---|---|
 | `id` | forbidden | forbidden — `ID_NOT_ALLOWED_ON_UPSERT` | allowed, alone, on `entry` and `sense` only | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
 | `hn` | forbidden | forbidden in the initializer list — `COMMAND_NOT_ALLOWING_HN`; allowed in the parent selector | allowed on `entry` only, together with `form` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
@@ -1390,7 +1390,7 @@ create relation(type = "variant", target = $newEntry)
   - `ensure`, to the component it asserts. `ensure` resolves exactly one component and fails loudly otherwise, which is precisely the precondition one wants before reusing a name, so `ensure sense[gloss@en = "pig"] under entry[...] as $pig` both checks and names in one line;
   - a **block header**, to the component that heads the block — whether the header is a selector chain, a `create`, an `upsert` or an `ensure` (section "11"). A `with` header binds no label, since it designates no component.
 - `delete`, `move`, `set`, `update` and `clear` bind no label. `delete` and `move` do not, because a label must keep denoting one component for the rest of its scope; the property commands do not, because they may carry `each`.
-- A label may be used wherever a step is expected on the `/` axis — as a command target, as a parent in `under`, `of` or `on` (in LiftPatchShort: as a path step, including the first), or as the value of a `reference` property. It is forbidden as the **parent side** of a `//` (`within`) link and inside a filtering selector, where it would be pointless: a label already denotes exactly one component, so there is nothing for an existential join to choose among. `$pig/x[t="a mami jefi"]` is therefore legal and `$pig//x[t="a mami jefi"]` is a syntax error.
+- A label may be used wherever a step is expected on the strict axis — as a command target, as a parent in `under`, `of` or `on` (in LiftPatchShort: as a path step, including the first), or as the value of a `reference` property. It is forbidden inside a filtering selector, where it would be pointless: a label already denotes exactly one component, so there is nothing to filter. For the same reason an existential join **below** a label reduces to the strict one: since the label denotes exactly one component, "some component matching the label" and "this component" are the same thing. `$pig/x[t="a mami jefi"]` is therefore legal, and means what `$pig!x[t="a mami jefi"]` means.
 - A label denotes a component, not a selector: it is not re-resolved, and it keeps denoting the same component even if the properties used to create it are afterwards modified.
 - Scope: a label is visible from its binding command to the end of the enclosing block, or to the end of the script if it is bound at top level. Re-binding a visible name raises `DUPLICATE_LABEL`; using an unbound name raises `UNKNOWN_LABEL`. Both are static errors.
 - If the command that binds a label is rolled back, the label is unbound.
@@ -1516,7 +1516,7 @@ existential filtering (`within`, section "7.4").
 - skipped ancestors are not allowed
 - a chain that **stops before reaching an `entry`** is rejected with `INCOMPLETE_ANCESTOR_CHAIN`. This is a static error: it depends only on the component types written in the command and on the metamodel, not on the dictionary. `set category = "Noun" on sense[gloss@en = "pig"]`, with no `of` or `within` clause, is therefore rejected before any lookup;
 - a chain in which two adjacent steps name component types that the metamodel does not relate as parent and child is rejected with `ILLEGAL_PARENT`, the code section "3" gives to every impossible parentage. **Skipping a level is this error, not the previous one**: in `on example[...] of entry[...]` the sense is missing, and what the command actually states is that an `example` is a child of an `entry`, which the hierarchy of section "3" forbids.
-- `of`, `under` and `on` are the three keyword spellings of the same axis, the strict-parent axis, written `/` in Part 3. Which keyword is used depends only on the position in the command, never on the semantics: `under` before the immediate parent of a component command, `on` before the immediate parent of a property command, `of` before every further ancestor.
+- `of`, `under` and `on` are the three keyword spellings of the same axis, the strict-parent axis, written `!` in Part 3 — or, between a command's parent path and its direct target, written as the whitespace that separates them (Part 3, section "4.1"). Which keyword is used depends only on the position in the command, never on the semantics: `under` before the immediate parent of a component command, `on` before the immediate parent of a property command, `of` before every further ancestor.
 
 #### 7.3.1 An `of` clause followed by a `within` chain
 
@@ -1552,7 +1552,7 @@ command itself — which resolves it under the ordinary strict-parent rule.
 
 **What the group rule does not relax.** It relaxes the *cardinality* of the
 steps, and nothing else. The selector `X` of the `of`/`under`/`on` clause is
-still a selector on the `/` axis, and it keeps every rule of section "5.1.3": one
+still a selector on the strict axis, and it keeps every rule of section "5.1.3": one
 selection strategy, no additional predicate, and none of the filtering-only
 predicates of section "5.1.2", which raise
 `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR` there as anywhere else. Only the
@@ -2893,11 +2893,11 @@ A line is a LiftPatchShort command line if and only if, after optional leading
 whitespace, it matches one of the following:
 
 1. `COMMAND-LETTER`, optionally followed by the multiplicity marker `*`, followed by one or more whitespace characters, followed by a second token that begins with:
-   - `/` — a path (`c /mami`, `d /e[f="mami"]/s[g="pig"]`), or
+   - `/` — a path (`c /mami`, `d /e[f="mami"] s[g="pig"]`), or
    - `$` — a label (`s $pig (c = "Noun")`), or
    - a component letter (or component name) immediately followed by `(` — a constructor with no parent path, which only `c` and `p` accept (`c e("mami")`, `p entry(f="mami", has-gloss="pig")`), or
    - `(` — the parenthesis of a property command with no path, which is admitted **only on an indented line**, where the parent is supplied by the enclosing indented block (`s (c = "Noun")`, section "3.3"), or
-   - a component letter (or component name) immediately followed by `[` or `#` — a *relative path*, also admitted **only on an indented line**, whose first step is a child of the enclosing indented block's component (`d x#1`, section "3.3").
+   - a component letter (or component name) immediately followed by `[` or `#` — a *relative path*, or the bare target step of a `d` or an `e`, also admitted **only on an indented line**, whose first step is a child of the enclosing indented block's component (`d x#1`, `d s[g="pig"] x#1`, section "3.3").
 2. `language-default ` or `language-create ` followed by `object` or `meta`:
 
 ```
@@ -2910,10 +2910,14 @@ language-create meta = "fr"
 3. the version pragma `%liftpatch 1.0`, anywhere before the first command line of the document; a pragma declaring a `sigil` must be the first non-blank line (section "1.1").
 
 Every command has a second token of one of the five shapes of rule 1: `c` and
-`p` take either a path or a constructor; `d`, `e`, `m`, `s`, `u` and `l` take a
-path, which begins with `/` or with a label; and on an indented line a property
-command may take its parenthesis directly, and `c` or `p` its constructor,
-because the enclosing indented block supplies the parent (section "3.3").
+`p` take either a path or a constructor; `s`, `u` and `l` take a path; `d`, `e`
+and `m` take either a parent path or — when their direct target is an entry or a
+label, and so has no parent path — a **rooted target step**; and in every case
+that second token begins with `/` or with a label, so the recognition rule itself
+is unchanged. On an indented line a property command may take its parenthesis
+directly, `c` or `p` its constructor, and `d` or `e` a relative path or a bare
+target step, because the enclosing indented block supplies the parent (section
+"3.3").
 
 **Leading whitespace is significant.** It does not change whether a line is a
 command — the rule above skips it — but it decides which component the command
@@ -2962,7 +2966,7 @@ ordinal marker of section "4.2", and a `#` inside a quoted string is an ordinary
 character:
 
 ```LiftPatchShort
-d /e[f="mami"]/s[g="pig"]/x#1   # deletes the first example, not a comment marker
+d /e[f="mami"]/s[g="pig"] x#1   # deletes the first example, not a comment marker
 ```
 
 Comments are not required in a mixed document, where prose lines already
@@ -2981,11 +2985,9 @@ The concise syntax is a subset. The following constructs of the reference syntax
 have no concise form, and a script that needs them must be written in
 LiftPatchRef:
 
-- the strict-parent axis on a link that is not immediately above the command target (section "4");
-- `hn` selection;
 - `with` language scoping;
 - an `at` clause on an embedded initializer (section "7");
-- a block header that is a bare selector chain with no verb: a LiftPatchRef block may be headed by `sense[gloss="pig"] of entry[form@tww="mami"] { … }`, which asserts nothing and creates nothing, whereas the head of an indented block is always a command. Write `e` (ensure) as the head to get the same effect: `e /e[f="mami"]/s[g="pig"]`. The restriction is on what a concise document may *write*: such a header may still appear in the LiftPatchRef expansion of a concise command, as it does for the embedded initializers of section "7".
+- a block header that is a bare selector chain with no verb: a LiftPatchRef block may be headed by `sense[gloss="pig"] of entry[form@tww="mami"] { … }`, which asserts nothing and creates nothing, whereas the head of an indented block is always a command. Write `e` (ensure) as the head to get the same effect: `e /e[f="mami"] s[g="pig"]`. The restriction is on what a concise document may *write*: such a header may still appear in the LiftPatchRef expansion of a concise command, as it does for the embedded initializers of section "7".
 
 Blocks themselves **do** have a concise form: an indented block (section "3.3")
 is the concise spelling of a LiftPatchRef block, with the same parent anchoring,
@@ -2999,7 +3001,7 @@ In concise syntax, commands, components, and properties are designated by a sing
 Some commands, components, and properties are abbreviated by the same letter (for instance, `e` = the `ensure` command and the `entry` component). However, the same letter is never used for two commands, for two properties, or for two components. Position alone decides which namespace a letter belongs to, and the rule is normative:
 
 1. The first token of a command line is a **command** letter, optionally followed by `*`.
-2. A letter immediately followed by `[`, `#`, or `(` and appearing either inside a path (after `/` or `//`) or as the head of an initializer is a **component** letter.
+2. A letter immediately followed by `[`, `#`, or `(` and appearing either inside a path (after `/` or `!`), or in direct-target position — the target step of a `d`, an `e` or the source of an `m` (section "4.1") — or as the head of an initializer, is a **component** letter.
 3. A letter appearing inside square brackets or inside a parenthesized list, and followed by (optional whitespace) `=`, `@`, `,` or `)`, is a **property** letter. All four terminators matter, the comma included: in the `clear` list `l /mami/pig (c, d@*)`, the property `c` (`category`) is followed by a comma and by nothing else.
 4. A letter followed by `(` inside an initializer list is a **component** letter opening an embedded initializer (section "7"); the same letter followed by `=`, possibly after whitespace, is a property letter. One token of look-ahead therefore suffices.
 
@@ -3045,12 +3047,12 @@ syntax (section "5.6" of Part 1) are written `*`, appended to the command
 letter:
 
 ```LiftPatchShort
-d* /e[f="mami"]/s[g="pig"]/x[t~"^draft"]
+d* /e[f="mami"]/s[g="pig"] x[t~"^draft"]
 s* /e[f="mami"]/s[g="pig"] (c = "Noun")
 ```
 
 - `*` is allowed only on `d`, `s`, `u` and `l`, that is on `delete`, `set`, `update` and `clear`. On `c`, `p`, `m` and `e` it raises `MULTIPLICITY_NOT_ALLOWED`. The grammar of Appendix C.2 admits `*` after every command letter precisely so that this check can report that code: a marker on the wrong verb is a mistake about the language, and telling the writer "multiplicity is not allowed here" is more useful than telling them the line does not parse.
-- It marks the target step of the command — the last step of the path for `d`, the last step of the path for the property commands — exactly as `all` / `each` do in the reference syntax, with the same rules and the same errors.
+- It marks the target step of the command — the direct-target step for `d` (section "4.1"), the last step of the path for the property commands — exactly as `all` / `each` do in the reference syntax, with the same rules and the same errors.
 
 ### 2.2 Component codes
 
@@ -3194,48 +3196,75 @@ p /mami/pig                      # the idiomatic form (section "8")
 
 #### *delete*
 
-The component represented by the last step of the path is deleted:
+The component denoted by the **target step** is deleted. The target step is
+written after the path of its parent, separated from it by whitespace, exactly
+as the constructor of a `c` command is:
 
 ```
-d <path>
+d [<parent-path>] <target-step>
 ```
 
-Following this rule, for entry a command as the following form:
+An `entry` has no parent, so its target step carries the root marker and stands
+alone:
 
 ```
-d /e[selector] # for entry
-```
-
-#### *move*
-
-The last step of the path is moved to a different position or, if a destination path is expressed, under another parent (the last step of the destination path) at the specified position:
-
-```
-m <source-path> [<destination-path>] at <position>
-```
-
-The `at <position>` clause is mandatory, as in the reference syntax. `m` cannot
-target an entry: `m /mami` is a syntax error.
-
-#### *ensure*
-
-The component denoted by the last step of the path is asserted to exist.
-`ensure` selects and never creates, so it takes a path and no constructor. Like
-`c` and `p`, it may bind a label (Part 1, section "6.3"), which makes it the
-concise way to name a component the document did not create:
-
-```
-e <path> [as $<label>]
+d /e[<selector>]   # for entry
+d /mami            # the same, abbreviated (section "6.1")
 ```
 
 ```LiftPatchShort
-e /e[f="mami"]/s[g="pig"]
-e /mami/pig
-e /mami/pig as $pig
+d /e[f="mami"]/s[g="pig"] x#1
+d /e[f="mami"] s[g="pig"]
+```
+
+A target written as two or more steps — `d /mami/pig` — is rejected with
+`TARGET_MUST_BE_A_SINGLE_STEP`, a static error (section "4.1").
+
+#### *move*
+
+The target step of the source is moved to a different position or, if a
+destination path is expressed, under another parent (the last step of the
+destination path) at the specified position. The destination path is introduced
+by the keyword `to`:
+
+```
+m <source-path> <target-step> [to <destination-path>] at <position>
+```
+
+`to` names the **parent** the component moves under, and is an ordinary parent
+path: its last step is the new parent, and the moved component is joined to it by
+the strict axis, which is not written.
+
+```LiftPatchShort
+m /e[f="mami"]/s[g="pig"] x#1 to /e[f="mami"]/s[g="large animal"] at end
+```
+
+The `at <position>` clause is mandatory, as in the reference syntax. `m` cannot
+target an entry: `m /mami` is a syntax error. Since `m` may not target an entry
+and may not appear in an indented block (section "3.3"), its source parent path
+is always present and always absolute, so the source path and the source target
+step are never ambiguous.
+
+#### *ensure*
+
+The component denoted by the **target step** is asserted to exist. `ensure`
+selects and never creates, so it takes a path and a target step and no
+constructor. Like `c` and `p`, it may bind a label (Part 1, section "6.3"), which
+makes it the concise way to name a component the document did not create:
+
+```
+e [<parent-path>] <target-step> [as $<label>]
+```
+
+```LiftPatchShort
+e /e[f="mami"] s[g="pig"]
+e /mami pig
+e /mami pig as $pig
 s $pig (c = "Noun")
 ```
 
-`ensure` may target any component type, `entry` included.
+`ensure` may target any component type, `entry` included; on an `entry` the
+target step stands alone, as it does for `d`: `e /mami`.
 
 ### 3.2 Property commands
 
@@ -3299,8 +3328,13 @@ s /e[f="mami"]/r[y="synonym", a = /e[id="entry-42"]] (a = /memi)
   to a path and not to a quoted id (Part 2, section "10"):
 
 ```LiftPatchShort
-d /e[f="mami"]/v[y="dialectal", a = /memi]
+d /e[f="mami"] v[y="dialectal", a = /memi]
 ```
+
+A path used as a **reference value** — the `/memi` above, or the `(a = /memi)`
+of the two preceding commands — has no separated target: it is not a command's
+parent path, so its **last step is the designated component** itself, and the
+unique/filtering rule of section "4.3" applies to it unchanged.
 
 **Labels.** A `c` or `p` command may bind the component it creates or resolves,
 with `as $<label>` at the end of the line; the label is then usable in any later
@@ -3360,7 +3394,7 @@ run, so:
 
 #### What an indented command may omit
 
-Inside a block, the parent is given, so the command need not name it. Three
+Inside a block, the parent is given, so the command need not name it. Four
 forms become available, and they are the forms the recognition rule of section
 "1.1" admits only on an indented line:
 
@@ -3368,7 +3402,8 @@ forms become available, and they are the forms the recognition rule of section
 |---|---|---|
 | no path | `c s("pig")` | create under the block's component |
 | no path | `s (c = "Noun")` | set on the block's component |
-| relative path | `d x#1` | a path whose first step is a **child** of the block's component |
+| target only | `d x#1` | a target step that is a **child** of the block's component |
+| relative path + target | `d s[g="pig"] x#1` | a parent path whose first step is a **child** of the block's component, and the target below it |
 
 A path that begins with `/` keeps its ordinary meaning inside a block: it is
 resolved from the root, exactly as at top level. The two are therefore never
@@ -3409,7 +3444,7 @@ may be `s`, `u`, `l`, `d` or `e` as well as `c`, and its anchor may be a `p` or
 an `e`, which is what lets a session update an entry that already exists:
 
 ```LiftPatchShort
-e /mami/pig as $pig
+e /mami pig as $pig
   s (d@en = "A four-legged terrestrial animal")
   l (d@fr)
   d* x[t ~ "^draft"]
@@ -3422,78 +3457,119 @@ error, so the line is safe on a sense that has no draft example.
 
 ## 4. Paths
 
-A path starts with a slash and is a sequence of slash-separated steps.
+A path starts with a slash and is a sequence of slash-separated steps. Every
+path written in a command is a **parent path**: it names the parent of what the
+command acts on, and never that thing itself. The **direct target** is always
+written after the path, outside it — as a constructor (`c`, `p`), as a
+parenthesized property list (`s`, `u`, `l`), or as a single *target step*
+separated from the path by whitespace (`d`, `e`, and the source of `m`). The
+only paths that are not parent paths are the ones used as **reference values**
+(section "3.2"), which designate their own last step.
 
 Each step is made of a letter indicating the component type (or the full
 component name, section "2") followed by one or several predicates between square
 brackets, or by an ordinal.
 
-Three properties of a path govern everything in this section, and the first is
-the one most easily got wrong when passing between the two syntaxes:
+Three properties of a parent path govern everything in this section, and the
+first is the one most easily got wrong when passing between the two syntaxes:
 
-- **A path reads from the ancestor down to the descendant**, left to right: `/e[f="mami"]/s[g="pig"]` is the entry first and its sense second. A LiftPatchRef chain reads the other way, from the component up to its ancestors: `sense[gloss@en="pig"] of entry[form@tww="mami"]` is the same chain written backwards (Part 1, section "5.1.1"). Wherever this section says "the step that follows", it means the step to the **right**, that is the **child**.
-- **A path starts at the root.** Its first step is an `entry` — written `e[…]`, `e#n` is not available since entries have no ordinal, or an abbreviated bare form (section "6.1") — or a label bound earlier in the document, which stands for whatever component it was bound to. A path whose first step is anything else is rejected with `INCOMPLETE_ANCESTOR_CHAIN`, a static error: `s /s[g="pig"] (c = "Noun")` names no entry. A path that **skips a level** of the hierarchy of Part 1, section "3", is a different error: `d /e[f="mami"]/x[t="…"]` states that an `example` is a child of an `entry`, and is rejected with `ILLEGAL_PARENT`.
-- **Inside an indented block, a path may instead be relative** (section "3.3"): written without the leading `/`, its first step is a child of the block's component. The rule above then applies from that component rather than from the root.
+- **A path reads from the ancestor down to the descendant**, left to right: `/e[f="mami"]/s[g="pig"]` is the entry first and its sense second. A LiftPatchRef chain reads the other way, from the component up to its ancestors: `sense[gloss@en="pig"] within entry[form@tww="mami"]` is the same chain written backwards (Part 1, section "5.1.1"). Wherever this section says "the step that follows", it means the step to the **right**, that is the **child**.
+- **A path starts at the root.** Its first step is an `entry` — written `e[…]`, `e#n` is not available since entries have no ordinal, or an abbreviated bare form (section "6.1") — or a label bound earlier in the document, which stands for whatever component it was bound to. A path whose first step is anything else is rejected with `INCOMPLETE_ANCESTOR_CHAIN`, a static error: `s /s[g="pig"] (c = "Noun")` names no entry. A path that **skips a level** of the hierarchy of Part 1, section "3", is a different error: `d /e[f="mami"] x[t="…"]` states that an `example` is a child of an `entry`, and is rejected with `ILLEGAL_PARENT`.
+- **Inside an indented block, a path may instead be relative** (section "3.3"): written without the leading `/`, its first step is a child of the block's component. The rule above then applies from that component rather than from the root. A `d` or an `e` inside a block may also carry no parent path at all, its target step then being a child of the block's component.
 
 ### 4.1 The axis of a link
 
 A path separator is an *axis*, and the concise syntax has two, exactly as the
-reference syntax (Part 1, section "5.1.1"):
+reference syntax (Part 1, section "5.1.1"). Each has one spelling, and that
+spelling does not depend on where the link stands:
 
 | Separator | Axis | Reference-syntax keyword |
 |---|---|---|
-| `/` | see the positional rule below | `under` / `of` / `on`, or `within` |
-| `//` | existential | `within` |
+| `/` | existential parent | `within` |
+| `!` | strict parent | `under` / `of` / `on` |
 
-The positional rule for the default separator `/` is stated once, in terms of the
-*direct target* of the command — the component or the property the command acts
-on:
+Five rules govern every path of the concise syntax.
 
-> **Exactly one link is strict: the one immediately above the direct target of
-> the command. Every other link is existential.**
+**R1 — Two axes, one spelling each.** `/` is the existential axis wherever it
+appears between two steps, and `!` is the strict axis wherever it appears. A
+**leading** `/`, the one that opens an absolute path, is not an axis at all: it
+is the *root marker* that says the first step is an `entry`.
 
-The direct target is not always inside the path, which is what makes the rule
-look different from one command to another. There are three cases, and they are
-exhaustive:
+**R2 — The direct target is never in the path.** Every command is written
 
-| Command | Where the direct target is | Which links of the path are strict |
-|---|---|---|
-| `d`, `e`, and the **source** path of `m` | the last step of the path | the **last link** of the path; every link above it is existential |
-| `c` and `p` with a constructor, and the **destination** path of `m` | not in the path: it is the component the constructor creates, or the component being moved | **none** — the strict link joins the target to the last step, and is not a link of the path. Every link of the path is existential, and the last step is the strict parent |
-| `s`, `u`, `l` | not in the path: it is a property | **none** — the strict link is the `on` link between the property and the last step. Every link of the path is existential |
+```text
+VERB [<parent-path>] <target>
+```
 
-The **path-only forms** of `c` and `p` — `c /mami/pig`, `p /mami/pig/"a mami
-jefi"` — are not in the table because they are not governed by the positional
-rule at all: sections "3" and "8" define them by their *expansion*, into a
-constructor command and into nested upserts respectively, and the positional rule
-applies to the expanded command. That is why `c /mami/pig` requires the entry
-"mami" to be unambiguous: its expansion, `c /e[f="mami"] s(g="pig")`, puts the
-entry immediately above the created sense, on the strict axis.
+where the link joining the last step of the parent path to the target is the
+**strict** axis and is never written: it is the whitespace between the two. The
+target is:
 
-Two consequences follow, and they are the ones an implementation is written from:
+| Command | Direct target |
+|---|---|
+| `c`, `p` | the constructor, `s(g="pig")` |
+| `s`, `u`, `l` | the parenthesized property list, `(c = "Noun")` |
+| `d`, `e`, source of `m` | a single **target step**, written after the path |
 
-- the **last step** of a path is always a unique selector: it is either the direct target or the strict parent of the direct target. It is a filtering selector only when the command carries the multiplicity marker `*` (section "4.3");
-- for `d`, `e` and the source path of `m`, the **second-to-last step** is a unique selector too, being the strict parent of the target. Every step above is a filtering selector.
+`m`'s destination is an ordinary parent path and is introduced by the keyword
+`to` (section "3.1"): `m <path> <step> [to <path>] at <position>`.
+
+**R3 — Unique versus filtering is decided by the axis, and by nothing else.**
+No step has to be counted:
+
+- the **direct-target step** is a unique selector — a *command selector* (Part 1, section "5.1.1") — unless the command carries the multiplicity marker `*`;
+- the **last step of a parent path** is a unique selector: it is the strict parent of the target;
+- a step whose **child** link is written `!` is a unique selector;
+- **every other step** is a filtering step.
+
+As in the reference syntax (Part 2, section "7.3.1"), a unique selector and the
+`/` chain of ancestors standing above it — to its **left**, in a concise path —
+form a single group, resolved as a whole: the uniqueness bears on the result of
+the group, not on each step of it. In `d /e[f="mami"]/s[g="pig"] x#1` the group
+is the whole parent path, the sense is the unique selector it must yield exactly
+one of, and the entry is a filtering step inside it.
+
+**R4 — Rooting and relativity are unchanged.** A leading `/` means "from the
+root"; its absence means "from the component of the enclosing indented block"
+(section "3.3"). When the target has no parent path — an `entry`, or a label —
+the **target step itself** carries the root marker: `d /mami`, `e /e[f="mami"]`,
+`d $pig`. Inside a block a `d` or an `e` may write its target step alone,
+`d x#1`, or a relative parent path and a target, `d s[g="pig"] x#1`.
+
+Parsing is deterministic: the **last top-level whitespace-separated path token**
+before any `to`, `at` or `as` clause is the direct target, and whatever precedes
+it is the parent path. *Top-level* means outside every bracket, parenthesis,
+brace and quoted string, so the space inside `e[f="mami", hn=1]` and the ones
+inside `v[y="dialectal", a = /memi]` do not split a token, and
+`d /e[f="mami", hn=1] v[y="dialectal", a = /memi]` has a one-step parent path and
+a one-step target. `m` is unambiguous for the same reason, and because it may not
+target an `entry` and may not appear in a block, so its source parent path is
+always present and always absolute.
+
+**R5 — The target is exactly one step.** A target token of two or more steps is
+rejected with `TARGET_MUST_BE_A_SINGLE_STEP`, a static error. `d /mami/pig` and
+`e /e[f="mami"]/s[g="pig"]` raise it: a command that writes its parent path and
+its target as one chain says nothing about where the one ends and the other
+begins, and the language refuses it loudly rather than guessing. Write
+`d /mami pig` and
+`e /e[f="mami"] s[g="pig"]`.
 
 So:
 
-- in `c /e[f="mami"] s(g="pig")`, the target is the created sense; the link between it and the entry is strict, and the path — one step — has no link at all;
-- in `c /e[f="mami"]/s[g="pig"] x(t="…")`, the target is the created example; the link example–sense is strict and lies outside the path, and the path's only link, sense–entry, is existential;
-- in `d /e[f="mami"]/s[g="pig"]`, the target is the sense; the link sense–entry is strict, so both steps are unique selectors;
-- in `d /e[f="mami"]/s[g="pig"]/x[t="…"]`, the target is the example; the link example–sense is strict, and the link sense–entry is existential;
-- in `s /e[f="mami"]/s[g="pig"] (c="Noun")`, the target is the `category` property; the strict link joins it to the sense, and the path's only link, sense–entry, is existential.
+- in `c /e[f="mami"] s(g="pig")`, the target is the created sense; the link between it and the entry is strict, unwritten, and the path — one step — has no link at all;
+- in `c /e[f="mami"]/s[g="pig"] x(t="…")`, the target is the created example; the link example–sense is strict and lies outside the path, and the path's only written link, sense–entry, is existential;
+- in `d /e[f="mami"] s[g="pig"]`, the target is the sense; the link sense–entry is the unwritten strict one, so both selectors are unique;
+- in `d /e[f="mami"]/s[g="pig"] x[t="…"]`, the target is the example; the link example–sense is the unwritten strict one, and the written link sense–entry is existential, so the entry is a filtering step;
+- in `d /e[f="mami"]!s[g="pig"] x[t="…"]`, the same delete with the sense–entry link made strict: the entry is now a unique selector too, and must resolve to exactly one entry;
+- in `s /e[f="mami"]/s[g="pig"] (c="Noun")`, the target is the `category` property; the strict link joins it to the sense, and the written link sense–entry is existential.
 
-Writing `//` forces the existential axis on a link that the positional rule
-would make strict. It is the only way, in the concise syntax, to say "delete
-that sense, wherever among the homophones of this form it may be":
-
-```LiftPatchShort
-d /e[f="mami"]//s[g="pig"]
-```
-
-The converse — forcing the strict axis on a link that the rule makes existential
-— has no concise form; a script that needs it must be written in LiftPatchRef
-(section "1.2").
+The **path-only forms** of `c` and `p` — `c /mami/pig`, `p /mami/pig/"a mami
+jefi"` — carry no separated target, because sections "3" and "8" define them by
+their *expansion*, into a constructor command and into nested upserts
+respectively, and the rules above apply to the expanded command. That is why
+`c /mami/pig` requires the entry "mami" to be unambiguous: its expansion,
+`c /e[f="mami"] s(g="pig")`, puts the entry immediately above the created sense,
+on the strict axis.
 
 This means that the following path, **used as the parent path of a command**:
 
@@ -3508,10 +3584,27 @@ s[g="pig"]
 within  e[f="mami"]
 ```
 
-Because the steps above the target are linked by the existential axis, the sense
-is selected out of the set of entries with a form "mami", by the existential
-join described in Part 1, section "7.4": the whole path must resolve to exactly
-one component, and it raises `AMBIGUOUS_REFERENCE` when it does not.
+Because the entry and the sense are linked by the existential axis, the sense is
+selected out of the set of entries with a form "mami", by the existential join
+described in Part 1, section "7.4": the whole path must resolve to exactly one
+component, and it raises `AMBIGUOUS_REFERENCE` when it does not.
+
+Written with the strict axis instead:
+
+```Path
+/e[f="mami", hn=1]!s[g="pig"]
+```
+
+translates into:
+
+```Fragment
+s[g="pig"]
+of  e[f="mami", hn=1]
+```
+
+Here the entry is a unique selector in its own right, which is what admits the
+pseudo-property `hn` on it (Part 1, section "5.1.4"): the entry must resolve to
+exactly one component, and then the sense must, under it.
 
 And with a `create` command, where the path selects a sense and the initializers create an example under it:
 
@@ -3534,8 +3627,8 @@ The ordinal of the reference syntax, written `#n` there (Part 1, section
 as a bare integer between square brackets:
 
 ```LiftPatchShort
-d /e[f="mami"]/s[g="pig"]/x#1
-d /e[f="mami"]/s[g="pig"]/x[1]
+d /e[f="mami"]/s[g="pig"] x#1
+d /e[f="mami"]/s[g="pig"] x[1]
 ```
 
 Both lines are equivalent to:
@@ -3569,35 +3662,31 @@ letter, since letters are reserved for component and property names:
 | `[has s[g = "pig"]]` | `[has sense[gloss = "pig"]]` | any step, subject to Part 1, section "5.3.2" |
 | `[has-gloss = "pig"]` | `[has-gloss = "pig"]` | see Part 1, section "5.3.2.2" |
 | `[id = "entry-42"]` | `[id = "entry-42"]` | see Part 1, section "5.3.1" |
+| `[hn = 1]` | `[hn = 1]` | see Part 1, section "5.3.2.1" |
 
-Which steps of a path are *unique selectors* and which are *filtering steps*
-follows from the positional rule of section "4.1", and is stated here
-positionally, so that it can be decided by counting steps:
+Which steps are *unique selectors* and which are *filtering steps* is rule R3 of
+section "4.1", restated here in full. It is decided by the axis of each link, and
+never by counting steps:
 
-- the **last step** of a path is a unique selector — always, since it is either the direct target of the command or the strict parent of the direct target;
-- for `d`, `e` and the source path of `m`, the **second-to-last step** is a unique selector as well, being the strict parent of the target;
-- **every other step** of the path is a filtering step;
-- the last step becomes a **filtering step** when the command carries the multiplicity marker `*`, which is exactly what the marker says;
-- any step inside a `has` predicate is a filtering step, at any depth.
-
-Writing `//` on a link does not change which steps are unique: it forces the
-existential axis on that link, and the step above a forced link is a filtering
-step like any step above an existential link. In `d /e[f="mami"]//s[g="pig"]`
-the sense is still the target and still a unique selector; what `//` relaxes is
-the entry, which no longer has to be unambiguous.
-
-The rule is stated positionally rather than in terms of the axis of the link
-above each step, because for a property command no link of the path is strict:
-an axis-based reading would make the `on` target a filtering step and would
-admit `s /e[f="mami"]/s[c="Noun"] (…)`, which Part 2, section "7.3.1", rejects.
+- the **direct-target step** of a `d`, an `e` or the source of an `m` is a unique selector. The other four commands have no target step to classify: the target of `c` and `p` is a constructor and the target of `s`, `u` and `l` is a property list, and neither selects anything;
+- the **last step of a parent path** is a unique selector: the link joining it to the direct target is the strict axis, written as whitespace;
+- a step whose **child** link is written `!` is a unique selector;
+- **every other step** — that is, every step on the parent side of a `/` link — is a filtering step;
+- the direct-target step becomes a **filtering step** when the command carries the multiplicity marker `*`, which is exactly what the marker says;
+- any step inside a `has` predicate is a filtering step, at any depth;
+- a path used as a **reference value** (section "3.2") has no separated target, so the same rules apply to it with its own last step in the direct-target position.
 
 Every step that is not a filtering step must select exactly one component, and a
 predicate restricted to filtering steps that appears there — typically on the
 immediate parent of the target — raises
 `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`, exactly as in the reference syntax.
+Conversely a pseudo-property — `id`, `hn`, `has-gloss`, an ordinal — may appear
+only on a unique selector, which is why `!` is what makes
+`/e[f="mami", hn=1]!s[g="pig"]` legal where `/e[f="mami", hn=1]/s[g="pig"]` is
+`PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`.
 
 ```LiftPatchShort
-d* /e[f ~ "^mam"]/s[g="pig"]/x[t ~i "^draft"]
+d* /e[f ~ "^mam"]/s[g="pig"] x[t ~i "^draft"]
 ```
 
 ```LiftPatchRef
@@ -3627,7 +3716,7 @@ The path identifies the parent of the component created.
 
 As in the reference language:
 
-- ensure (e) takes no initializer at all: it is an assertion and its component is designated by the last step of a path (section "3")
+- ensure (e) takes no initializer at all: it is an assertion, and its component is designated by the target step written after its parent path (section "3.1")
 - upsert (p) requires all identity properties
 - the `at <position>` clause behaves as in Part 1, section "6.2": optional on `c` and `p`, defaulting to `at end`, forbidden on `e` and on any command creating an `entry` (`c e("mami") at beginning` is a syntax error).
 - an `as $<label>` binding may close a `c`, `p` or `e` command line (section "3"), and binds the created, resolved or asserted component (Part 1, section "6.3")
@@ -3661,12 +3750,13 @@ create sense(gloss = { en: "pig", fr: "cochon" })
 
 ### 5.2 Delete
 
-The `delete` command deletes the last step of the path.
+The `delete` command deletes the component named by its target step, the token
+that follows its parent path.
 
 This command:
 
 ```LiftPatchShort
-d /e[f="mami"]/s[g="pig"]
+d /e[f="mami"] s[g="pig"]
 ```
 
 This translates into:
@@ -3679,7 +3769,7 @@ delete sense[gloss="pig"] under
 This command:
 
 ```LiftPatchShort
-d /e[f="mami"]/s[g="pig"]/x[t="a mami jefi"]
+d /e[f="mami"]/s[g="pig"] x[t="a mami jefi"]
 ```
 
 This translates into:
@@ -3690,13 +3780,14 @@ delete example[text="a mami jefi"]
   within entry[form="mami"]
 ```
 
-As stated in section "4.1", the link immediately above the target — here
-example–sense — is the strict axis, and every link above it is existential.
+As stated in section "4.1", the link between the path and the target — here
+example–sense — is the strict axis and is not written; every link of the path is
+existential unless it is written `!`.
 
 ### 5.3 Move
 
 ```LiftPatchShort
-m /e[f="mami"]/s[g="pig"] at index 1
+m /e[f="mami"] s[g="pig"] at index 1
 ```
 
 It translates into:
@@ -3707,12 +3798,14 @@ under entry[form="mami"]
 at index 1
 ```
 
-When `move` has a second path, it is equivalent to a move with an under clause in the reference syntax: it moves towards another parent.
+When `move` has a `to` clause, it is equivalent to a move with a second under
+clause in the reference syntax: it moves towards another parent. The `to` path is
+an ordinary parent path, and its last step is the new parent.
 
 Then, the following: 
 
 ```LiftPatchShort
-m /e[f="mami"]/s[g="pig"]/x#1 /e[f="mami"]/s[g="large animal"] at end
+m /e[f="mami"]/s[g="pig"] x#1 to /e[f="mami"]/s[g="large animal"] at end
 ```
 
 is equivalent to:
@@ -3733,8 +3826,8 @@ ordinal — and it must select exactly one same-type sibling of the destination
 parent:
 
 ```LiftPatchShort
-m /e[f="mami"]/s[g="pig"]/x#3 at after x[t="a mami jefi"]
-m /e[f="mami"]/s[g="pig"]/x#3 at before #2
+m /e[f="mami"]/s[g="pig"] x#3 at after x[t="a mami jefi"]
+m /e[f="mami"]/s[g="pig"] x#3 at before #2
 ```
 
 ```LiftPatchRef
@@ -3946,17 +4039,18 @@ entry–sense–example chain is the chain a lexicographer writes most often, an
 because it is what makes `c /mami/pig/"a mami jefi"` (section "3") and
 `p /mami/pig/"a mami jefi"` (section "8") mean what they look like.
 
-**The abbreviation is positional, and the list of positions is exhaustive:**
+**The abbreviation is decided by the depth of the step below the root, and the
+list of depths is exhaustive:**
 
-| Position in the path | Component | Property |
+| Depth from the root | Component | Property |
 |---|---|---|
 | 1 | `entry` | `form` |
 | 2 | `sense` | `gloss` |
 | 3 | `example` | `text` |
 
-- The position is counted from the root, and nothing else decides it: what the earlier steps look like is irrelevant, so `/e[f="mami"]/pig` is a legal path whose second step is the abbreviated sense, and `/mami/s[g="pig"]/"a mami jefi"` is legal too.
-- A bare or quoted step at position 4 or deeper raises `ABBREVIATED_STEP_NOT_ALLOWED_HERE`, a static error. There is no abbreviation below the example, because below it the component type is no longer determined by the position: a sense may hold an example, a note, a field, an illustration and more.
-- Abbreviated steps are available only in a path that begins at the root, that is one written with a leading `/` whose first step is position 1. In a **relative** path inside an indented block (section "3.3"), and in a path that begins with a **label**, the position from the root is not written down, so every step must name its component type; a bare or quoted step there raises the same error.
+- The depth is counted from the root **across the parent path and the direct target together** (section "4.1"), and nothing else decides it: the target step of `d /mami/pig "a mami jefi"` is at depth 3 and is the abbreviated example, exactly as the last step of the parent path of `c /mami/pig/"a mami jefi" o("free", "…")` is. A target step that is not separated from the path — there is none, since a target is exactly one step — never changes the count, and neither does the shape of the earlier steps: `/e[f="mami"]/pig` is a legal path whose second step is the abbreviated sense, and `/mami/s[g="pig"]/"a mami jefi"` is legal too.
+- A bare or quoted step at depth 4 or deeper raises `ABBREVIATED_STEP_NOT_ALLOWED_HERE`, a static error, so `d /mami/pig/"a mami jefi" foo` is rejected: its target step is at depth 4. There is no abbreviation below the example, because below it the component type is no longer determined by the depth: a sense may hold an example, a note, a field, an illustration and more.
+- Abbreviated steps are available only where the depth from the root is written down, that is in a path opened by the root marker `/` whose first step is at depth 1, and in the target step that follows such a path. In a **relative** path inside an indented block (section "3.3"), in a bare target step inside one, and in a path that begins with a **label**, the depth from the root is not written down, so every step must name its component type; a bare or quoted step there raises the same error.
 
 #### 6.1.1 The bare word
 
@@ -4541,7 +4635,7 @@ listed in B.4.
 | `UNKNOWN_PRAGMA_ATTRIBUTE` | the version pragma carries an attribute other than `sigil` and `metamodel` | 1.1 |
 | `UNSUPPORTED_METAMODEL` | the pragma requires a metamodel that the implementation has not loaded | 1.1, Appendix A |
 | `PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE` | a property is used on a component type on which Appendix A does not define it | 4.1, 7.1 |
-| `ILLEGAL_PARENT` | two component types are stated to be parent and child where Appendix A does not relate them: a component created or moved under such a parent, a `create entry(...)` in a block body, or two adjacent steps of a chain or a path — which is what "skipping a level" amounts to, as in `on example[...] of entry[...]` or `d /e[f="mami"]/x[t="…"]` | 3, 7.3, 8.5, 11 |
+| `ILLEGAL_PARENT` | two component types are stated to be parent and child where Appendix A does not relate them: a component created or moved under such a parent, a `create entry(...)` in a block body, or two adjacent steps of a chain or a path — which is what "skipping a level" amounts to, as in `on example[...] of entry[...]` or `d /e[f="mami"] x[t="…"]` | 3, 7.3, 8.5, 11 |
 | `LANG_KEY_NOT_SUPPORTED_ON_SCALAR` | an `@L` or `@*` qualifier, or a multi-language literal, is written on a scalar property | 4.4, 5.5.1 |
 | `MISSING_LANGUAGE_QUALIFIER` | `clear` is written on a multitext with neither a language code nor `@*` | 9.3.1 |
 | `WILDCARD_NOT_ALLOWED` | `@*` is used where it is forbidden: in a `create`, `upsert`, `set` or `update` assignment | 4.4.1, 9.1, 9.2 |
@@ -4553,7 +4647,7 @@ listed in B.4.
 | `MISSING_REQUIRED_PROPERTY` | a `create` or `upsert` initializer list omits a property that Appendix A declares required | 6.1 |
 | `MISSING_IDENTITY_PROPERTY` | an `upsert` initializer list does not cover the whole natural identity property set of the component type | 8.2 |
 | `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR` | a unique selector carries a predicate that is not part of its selection strategy: either a filtering-only operator (`!=`, `~`, `~i`, `exists()`, `absent()`), or an otherwise legal predicate added to a complete strategy, as in `sense[gloss@en = "pig", category = "Noun"]`. The `has` refinement of strategies S3 and S4 and the `hn` refinement of S4 are part of the strategy and are not additions | 5.1.2, 5.1.3, 5.4.1 |
-| `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | `id`, `hn`, `has-gloss` or an ordinal is used in a filtering selector — the parent side of `within` / `//`, a step inside `has`, or a step marked `each` / `all` / `*` | 5.1.4, 5.3 |
+| `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | `id`, `hn`, `has-gloss` or an ordinal is used in a filtering selector — the parent side of `within` / `/`, a step inside `has`, or a step marked `each` / `all` / `*` | 5.1.4, 5.3 |
 | `COMMAND_NOT_ALLOWING_HN` | `hn` is used with a command that does not allow it, in particular in an `upsert` initializer list | 5.3.2.1 |
 | `COMMAND_NOT_ALLOWING_HAS` | `has` or `has-gloss` is used with a command that does not allow it, `create` in particular | 5.3.2.2 |
 | `HN_CANNOT_BE_USED_ALONE` | `hn` is used in a selector that does not also give `form` | 5.3.2.1 |
@@ -4563,9 +4657,10 @@ listed in B.4.
 | `ID_NOT_ALLOWED_ON_UPSERT` | `id` is used in an `upsert` initializer list | 8.2 |
 | `UPSERT_ENTRY_WITHOUT_DISAMBIGUATION` | `upsert entry(...)` gives a `form` with no `has` or `has-gloss` predicate | 8.2 |
 | `INCOMPLETE_ANCESTOR_CHAIN` | a chain or a path stops before reaching the root: `on sense[...]` with no further ancestor clause, `/s[g="pig"]`. A chain that skips a level is `ILLEGAL_PARENT` instead | 7.3, Part 3, 4 |
-| `MISSING_PARENT_CLAUSE` | a command gives no parent where one is required: a component command whose target is not an `entry` written with no `under` clause, or a property command written with no `on` clause, outside a block; in LiftPatchShort, the same commands written with no path outside an indented block | 7.2, 11, Part 3, 3, 3.1 |
+| `MISSING_PARENT_CLAUSE` | a command gives no parent where one is required: a component command whose target is not an `entry` written with no `under` clause, or a property command written with no `on` clause, outside a block; in LiftPatchShort, the same commands written with no path outside an indented block, which includes a `d` or an `e` whose target step is not an `entry` or a label and which carries no parent path, as in an indented `d x#1` or `d s[g="pig"] x#1` that no enclosing block anchors | 7.2, 11, Part 3, 3, 3.1 |
 | `CONSTRUCTOR_REQUIRED` | a `c` or `p` command is written with a path and no constructor, and a step it would have to create is not an abbreviated step: `c /e[f="mami"]/s[g="pig"]` | Part 3, 3, 8 |
-| `ABBREVIATED_STEP_NOT_ALLOWED_HERE` | a bare word or a quoted string is written as a path step at a position for which no abbreviation is defined: below the third step, in a relative path, or in a path beginning with a label | Part 3, 6.1 |
+| `TARGET_MUST_BE_A_SINGLE_STEP` | the direct target of a `d`, an `e` or the source of an `m` is written as two or more steps, as in `d /mami/pig`, instead of a parent path followed by one target step | Part 3, 3.1, 4.1 |
+| `ABBREVIATED_STEP_NOT_ALLOWED_HERE` | a bare word or a quoted string is written as a step at a depth from the root for which no abbreviation is defined: at depth 4 or deeper, counted across the parent path and the direct target together, or at any depth in a relative path, in a bare target step inside a block, or in a path beginning with a label, where the depth from the root is not written down | Part 3, 6.1 |
 | `OPERATOR_NOT_APPLICABLE_TO_DATATYPE` | an operator is used on a datatype that does not admit it, such as `~` or `~i` on a `reference` or an `integer` property | 5.1.2 |
 | `INVALID_TARGET` | the component designated as the value of a `reference` property is neither an `entry` nor a `sense`. Static, because the component type is written in the chain or is known from the label's binding | 10 |
 | `MULTIPLICITY_NOT_ALLOWED` | `each` / `all` (or `*` in LiftPatchShort) is used on a parent step, on `create`, `upsert`, `ensure` or `move`, or on a command used as the anchor of an indented block | 5.6, Part 3, 3.3 |
@@ -4582,7 +4677,7 @@ listed in B.4.
 Syntax errors are static too, and are reported with their position. They include
 in particular:
 
-- in both syntaxes: an `ensure` with an initializer list instead of a selector; an `at` clause on `ensure` or on a command creating an `entry`; an `at before` / `at after` step whose component type is not the type being placed (section "6.2.1"); a step combining an ordinal with a predicate; a label on the parent side of a `within` / `//` link; an unterminated string, a raw line break inside a string, or a backslash followed by anything other than `"` or `\` in a double-quoted string (section "1.2");
+- in both syntaxes: an `ensure` with an initializer list instead of a selector; an `at` clause on `ensure` or on a command creating an `entry`; an `at before` / `at after` step whose component type is not the type being placed (section "6.2.1"); a step combining an ordinal with a predicate; an unterminated string, a raw line break inside a string, or a backslash followed by anything other than `"` or `\` in a double-quoted string (section "1.2");
 - in LiftPatchRef: `move entry[...]`; a `move` without an `at` clause;
 - in LiftPatchShort: a command spread over several physical lines; `m /mami`, which would move an entry; a tab character in the indentation of a command line, and an indentation that matches no open block level (Part 3, section "3.3").
 
@@ -4747,7 +4842,7 @@ Notes on the productions that carry a rule of their own:
 - `move` takes one `under` chain for the source parent and an optional second one for the destination parent; `at-clause` is mandatory. `move` is absent from `block-command`: it cannot appear in a block body (`MOVE_NOT_ALLOWED_IN_BLOCK`, section "11").
 - The optional `'under'` / `'on'` clauses are omitted only inside a block, whose header supplies the parent (section "11"). The grammar makes them optional everywhere because it does not know whether it is inside a block; a command other than one targeting an `entry` that omits its parent clause at top level is rejected with `MISSING_PARENT_CLAUSE`, a static error.
 - The grammar admits a `chain` that stops before reaching an `entry`, and one whose steps skip a level of the hierarchy, because parentage is a metamodel question; both are rejected with `INCOMPLETE_ANCESTOR_CHAIN` (section "7.3").
-- The grammar admits a `label-ref` as any `step` of a `chain`, including after `within`; a label on the parent side of a `within` link is a syntax error (section "6.3").
+- The grammar admits a `label-ref` as any `step` of a `chain`, including after `within`. A label denotes exactly one component, so an existential join below one reduces to the strict one and the two spellings mean the same thing (section "6.3").
 - `at-clause` is forbidden when the constructor creates an `entry` (section "6.2"). The grammar cannot express that restriction, since `component-type` is one production; it is a static error.
 - On a property of datatype `reference`, the `value` of an `assignment`, of an `initializer` and of a `predicate` alike must be a `chain` or a `label-ref`, never a `string` (section "10"): `REFERENCE_VALUE_MUST_BE_A_CHAIN`. The grammar admits `string` there because it does not know datatypes.
 
@@ -4769,9 +4864,10 @@ command           ::= create-cmd | upsert-cmd | ensure-cmd | delete-cmd | move-c
 
 create-cmd        ::= 'c' [ '*' ] ( [ path ] constructor [ at-clause ] [ label-binding ] | path )
 upsert-cmd        ::= 'p' [ '*' ] ( [ path ] constructor [ at-clause ] [ label-binding ] | path )
-ensure-cmd        ::= 'e' [ '*' ] path [ label-binding ]
-delete-cmd        ::= 'd' [ '*' ] path
-move-cmd          ::= 'm' [ '*' ] path [ path ] at-clause
+ensure-cmd        ::= 'e' [ '*' ] target-spec [ label-binding ]
+delete-cmd        ::= 'd' [ '*' ] target-spec
+move-cmd          ::= 'm' [ '*' ] target-spec [ 'to' path ] at-clause
+target-spec       ::= [ path spaces ] [ '/' ] path-step
 set-cmd           ::= 's' [ '*' ] [ path ] '(' assignment { ',' assignment } ')'
 update-cmd        ::= 'u' [ '*' ] [ path ] '(' assignment { ',' assignment } ')'
 clear-cmd         ::= 'l' [ '*' ] [ path ] '(' property-ref { ',' property-ref } ')'
@@ -4785,10 +4881,10 @@ short-value       ::= string [ '@' lang ] | integer | multitext-literal
                     | path | label-ref
 
 path              ::= absolute-path | relative-path
-absolute-path     ::= label-ref { axis path-step }
-                    | axis path-step { axis path-step }
+absolute-path     ::= '/' path-step { axis path-step }
+                    | label-ref { axis path-step }
 relative-path     ::= path-step { axis path-step }
-axis              ::= '/' | '//'
+axis              ::= '/' | '!'
 path-step         ::= component-code ( '[' selector ']' | ordinal | '[' integer ']' )
                     | abbreviated-step
                     | label-ref
@@ -4812,26 +4908,26 @@ property-code     ::= 'f' | 'm' | 'd' | 'g' | 'c' | 't' | 's' | 'a' | 'u' | 'l'
 ```
 
 `selector`, `multitext-literal`, `component-type` and `property-name` are those
-of C.1, with one exception: the `hn` predicate is **not** part of the concise
-syntax (Part 3, section "1.2"), and a step carrying it is a syntax error.
-`component-code` and `property-code` accept the one-letter code and the full
-reference name alike (Part 3, section "2").
+of C.1, `hn` included. `component-code` and `property-code` accept the one-letter
+code and the full reference name alike (Part 3, section "2").
 
-Two productions are ambiguous on their own and are disambiguated by the rules of
-Part 3, sections "1.1" and "2", which a parser MUST apply:
+Three productions are ambiguous on their own and are disambiguated by the rules of
+Part 3, sections "1.1", "2" and "4.1", which a parser MUST apply:
 
+- `target-spec`: the `[ path spaces ]` and the final `path-step` are separated by whitespace, and the **last top-level whitespace-separated path token** of the command, before any `to`, `at` or `as` clause, is the `path-step`; everything before it is the `path` (Part 3, section "4.1"). Top-level means outside every bracket, parenthesis, brace and quoted string, so whitespace inside a selector never splits a token. The optional `'/'` before that `path-step` is the root marker, and may be written only when no `path` precedes it.
 - `command-line` versus `prose-line`: a line is a command only if it satisfies the recognition rule of section "1.1" — command letter, optional `*`, whitespace, then a token beginning with `/`, with `$`, with a component code immediately followed by `(`, or — on an indented line only — with `(` or with a component code immediately followed by `[` or `#`. When a sigil is declared, a line is a command **if and only if** it begins, after optional whitespace, with that sigil; the `[ sigil ]` of the `command-line` production is optional only because one production covers both modes. A line that matches the rule but does not parse is an error, never prose.
 - `component-code` versus `abbreviated-step` and `property-code` versus a value: one character of look-ahead decides. A letter followed by `[`, `#` or `(` is a component code; a letter followed by `=`, `@`, `,` or `)` is a property code; anything else in a path step is a bare word, that is an abbreviated step (Part 3, section "6.1").
 
-Seven further constraints are not expressed by the grammar and are static errors:
+Eight further constraints are not expressed by the grammar and are static errors:
 
 - `indent` is the whitespace between the sigil — or the start of the line, when no sigil is declared — and the command letter. It is significant (Part 3, section "3.3"), and it MUST be made of spaces: a tab there is a `SYNTAX_ERROR`, as is an indentation matching no open block level.
 - `[ path ]` is omitted, and `relative-path` is used, only on an **indented** line, whose enclosing block supplies the parent. At top level both raise `MISSING_PARENT_CLAUSE`.
+- in a `target-spec`, `[ path spaces ]` is omitted only when the target is an `entry`, a `label-ref`, or a child of the enclosing indented block; otherwise `MISSING_PARENT_CLAUSE`.
+- the direct target of a `delete-cmd`, an `ensure-cmd` or a `move-cmd` is exactly one step: a target written as a chain of steps raises `TARGET_MUST_BE_A_SINGLE_STEP`.
 - `[ '*' ]` is admitted on all eight commands so that a marker on `c`, `p`, `e` or `m` can be reported as `MULTIPLICITY_NOT_ALLOWED` rather than as a parse failure, and so that `*` on the anchor of an indented block can be reported the same way.
 - the path-only alternative of `create-cmd` and `upsert-cmd` requires every step it creates to be an `abbreviated-step`; otherwise `CONSTRUCTOR_REQUIRED`.
-- an `abbreviated-step` is admitted by the grammar at any position, and is legal only at positions 1, 2 and 3 of an `absolute-path` that does not begin with a label; elsewhere `ABBREVIATED_STEP_NOT_ALLOWED_HERE`.
-- at most one `pragma-line` may appear in a document, and it must precede the first `command-line`; a pragma declaring a `sigil` must be the first non-blank line (section "1.1");
-- a `label-ref` may not stand on the parent side of a `//` link.
+- an `abbreviated-step` is admitted by the grammar anywhere, and is legal only at depth 1, 2 or 3 below the root, counted across the `path` and the target `path-step` of a `target-spec` together, and only when the path is an `absolute-path` that does not begin with a label; elsewhere `ABBREVIATED_STEP_NOT_ALLOWED_HERE`.
+- at most one `pragma-line` may appear in a document, and it must precede the first `command-line`; a pragma declaring a `sigil` must be the first non-blank line (section "1.1").
 
 ## Appendix D. The conformance corpus
 
@@ -5130,9 +5226,9 @@ implementation MAY add cases; it MUST pass these.
       { "kind": "propertySet", "property": "category", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
 
   { "id": "C-027", "section": "Part 3, 3", "syntax": "LiftPatchShort",
-    "description": "in a component command the link above the target is strict, so the homophones are ambiguous",
+    "description": "the link between the path and the target is strict, so the homophones are ambiguous",
     "dictionary": "standard",
-    "script": "d /e[f=\"mami\"]/s[g=\"taro\"]",
+    "script": "d /e[f=\"mami\"] s[g=\"taro\"]",
     "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 } },
 
   { "id": "C-028", "section": "Part 3, 8", "syntax": "LiftPatchShort",
@@ -5334,9 +5430,9 @@ implementation MAY add cases; it MUST pass these.
     "expect": { "status": "error", "code": "CONSTRUCTOR_REQUIRED", "kind": "static", "commandIndex": 1 } },
 
   { "id": "C-055", "section": "Part 3, 6.1", "syntax": "LiftPatchShort",
-    "description": "there is no abbreviated step below the third position",
+    "description": "there is no abbreviated step below the third depth",
     "dictionary": "standard",
-    "script": "d /mami/pig/\"a mami jefi\"/foo",
+    "script": "d /mami/pig/\"a mami jefi\" foo",
     "expect": { "status": "error", "code": "ABBREVIATED_STEP_NOT_ALLOWED_HERE", "kind": "static", "commandIndex": 1 } },
 
   { "id": "C-056", "section": "1.1", "syntax": "LiftPatchShort",
@@ -5359,6 +5455,38 @@ implementation MAY add cases; it MUST pass these.
     "description": "a move to another parent reports one componentMoved with both positions",
     "dictionary": "standard",
     "script": "move example#1\n  under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  under sense[gloss@en = \"pork\"] of entry[form@tww = \"mami\", hn = 1]\n  at end",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 1 } ] } },
+
+  { "id": "C-059", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
+    "description": "every written link of a parent path is existential, so a path over two homophones that both carry the sense is ambiguous",
+    "dictionary": "standard",
+    "script": "d /mami/pig x#1",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-060", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
+    "description": "the strict axis is written ! on any link, and makes the step above it a unique selector, which is what admits hn",
+    "dictionary": "standard",
+    "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] x#1",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentDeleted", "componentType": "example", "position": 1 } ] } },
+
+  { "id": "C-061", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
+    "description": "the direct target of a delete is exactly one step, written after the parent path",
+    "dictionary": "standard",
+    "script": "d /mami/pig",
+    "expect": { "status": "error", "code": "TARGET_MUST_BE_A_SINGLE_STEP", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-062", "section": "Part 3, 3.1", "syntax": "LiftPatchShort",
+    "description": "ensure with a separated target step succeeds and changes nothing",
+    "dictionary": "standard",
+    "script": "e /memi dog",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [] } },
+
+  { "id": "C-063", "section": "Part 3, 5.3", "syntax": "LiftPatchShort",
+    "description": "a concise move with a to clause reports one componentMoved with both positions, as C-058 does in the reference syntax",
+    "dictionary": "standard",
+    "script": "m /e[f=\"mami\", hn=1]!s[g=\"pig\"] x#1 to /e[f=\"mami\", hn=1]!s[g=\"pork\"] at end",
     "expect": { "status": "ok", "effects": [
       { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 1 } ] } }
 ]
