@@ -1,8 +1,8 @@
 # lift-patchbox
 
-A complete language, with both a lighweight and a verbose syntax sharing the same semantics, for editing a dictionary into LIFT format.
+A complete language for editing a dictionary into LIFT format through commands.
 
-Instead of opening Elan or Fieldwork explorer for entering lexical information, type directly your fieldnote / idea using this command language, or convert questionaire/spreadsheet into such commands:
+Instead of opening Elan or SIL Fieldwork for entering lexical information, type directly your fieldnote / idea using this command language, or convert questionaire/spreadsheet into such commands:
 
 ```
 ##
@@ -59,10 +59,14 @@ This library implements a domain-specific language (DSL) for creating, modifying
 It allows the user to notate concisely lexical information, such as :
 
 ```
-u /"mami"/"pig"
+# set (s) the definition on the sense "pig" of the entry "mami"
+s /"mami"/"pig" (definition="A four-legged large terrestrial animal")
+
+# assert the existence of a lexical unit of form "mami" and gloss "pig", create it if it does not exist
+# quotes are not necessary for string without special character
+p /mami/pig 
 ```
 
-for asserting the existence of a lexical unit of form "mami" and gloss "pig".
 Such commands, that can be listed in a file, can be used to enrich an existing
 LIFT dictionary. These short notations can also be generated easily from
 spreadsheet or other format.

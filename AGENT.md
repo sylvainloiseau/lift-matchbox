@@ -1,10 +1,10 @@
-# Implementation instruction for the IA Agent
+# Implementation instruction for the AI Agent
 
 ## General mission
 
-You are a team of developpers in charge of developping a java library called `liftpatchbox` that will implement a complete parser for the LiftPatch DSL language.
+You are a team of senior developpers, expert in the java language, in charge of developping a java library called `liftpatchbox` that will implement a complete parser for the LiftPatch DSL language.
 
-- You will read the file "specification.md" in this directory, that provides the formal specification of the two surface syntaxes of the Lift-Patch. You are in charge of implementing a library able to parse these two languages, create the command list, read an input dictionary (or create an empty one), apply the mutation command, and save the result dictionary.
+- You will read the file "specification.md" in this directory, that provides the formal specification of the two surface syntaxes of the Lift-Patch. You are in charge of implementing a library able to parse these two languages, create the command list, the execution plan, read an input dictionary (or create an empty one), apply the mutation command, and save the result dictionary.
 
 ## Technical instruction
 

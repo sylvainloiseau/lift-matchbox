@@ -1,3 +1,9 @@
+---
+Author: Sylvain Loiseau
+Last edit: 2026/09/13
+Version: 1.0
+Title: "LiftPatch: a mutation language for the LIFT data model"
+---
 
 # LiftPatch: a mutation language for the LIFT data model
 
@@ -13,7 +19,7 @@ that are attached to the components, such as the `form` (on an `entry` component
 1. Every operation has an explicit verb: `create`, `ensure`, `set`, `upsert`, `update`, `clear`, `delete`, or `move`.
 2. Parentheses describe a component being created and initialized with natural identity properties.
 3. Square brackets select an existing component.
-4. Multiple matches of a component during lookup are always errors (except in `within` clauses where intermediate non-unique matches are permitted). The language never silently selects the first match.
+4. Multiple matches of a component during lookup are always errors, with two stated exceptions: in a `within` clause, where intermediate non-unique matches are permitted, and on a step carrying an explicit multiplicity keyword (`each`, `all`, or `*` in LiftPatchShort). The language never silently selects the first match.
 5. `set` creates or replaces a property value.
 6. `update` replaces an existing property and never creates it.
 7. `clear` removes property values without removing the parent component.
@@ -24,30 +30,48 @@ that are attached to the components, such as the `form` (on an `entry` component
 12. `ensure` **asserts** that a component exists. It never creates anything and never modifies anything; it fails if the component is absent.
 13. A command, a block, and a whole script each either succeed completely or have no effect.
 14. A command operates on exactly one component unless an explicit multiplicity keyword (`each`, `all`) is written. Multiplicity is never implicit.
-15. A component created by a command may be given a label (`as $name`) so that later commands in the same script can refer to it without selecting it again.
+15. A component created, resolved or asserted by a command may be given a label (`as $name`) so that later commands in the same script can refer to it without selecting it again.
 
 ### 1.1 Language version
 
-A script MAY declare the version of the language it targets with a version pragma. When present, the pragma MUST be the first non-blank, non-comment line of the file:
+A script MAY declare the version of the language it targets with a version pragma:
 
 ```text
 %liftpatch 1.0
 ```
 
+When present, the pragma MUST appear **before the first command** of the script.
+Blank lines, comment lines and — in a LiftPatchShort document — ordinary prose
+lines may precede it, so that a field-note file may open with a title. 
+
+A pragma that declares a `sigil` (see below) MUST be the first non-blank line of the document, because the sigil is what decides which lines are commands at all, and that decision cannot depend on a pragma that only a command-aware scan would find.
+
 The pragma has the same form in both surface syntaxes. A script without a pragma is processed as `1.0`. An implementation that does not support the declared version MUST reject the script with `UNSUPPORTED_LANGUAGE_VERSION`.
 
 The pragma may carry named attributes after the version number, written
-`name="value"` and separated by whitespace. Two are defined in version 1.0:
+`name="value"` and separated by whitespace. Three are defined in version 1.0:
 
 - `sigil`, meaningful in LiftPatchShort documents only, which declares the line prefix that marks a command (Part 3, section "1.1");
-- `metamodel`, which names the metamodel the script requires (Appendix A). When it is present and does not name the metamodel the implementation has loaded, the script is rejected with `UNSUPPORTED_METAMODEL`. When it is absent, the script is validated against the metamodel of Appendix A.
+- `metamodel`, which names the metamodel the script requires (Appendix A). When it is present and does not name the metamodel the implementation has loaded, the script is rejected with `UNSUPPORTED_METAMODEL`. When it is absent, the script is validated against the metamodel of Appendix A;
+- `syntax`, whose value is `"LiftPatchRef"` or `"LiftPatchShort"`, which declares which of the two surface syntaxes the script is written in. When it is present, the implementation MUST parse the script with the declared syntax; when it is absent, the implementation determines the syntax by other means (a file extension, a command-line option), and the value it used MUST be reported in the plan document (section "12.4.1").
 
 ```text
 %liftpatch 1.0 sigil=">"
 %liftpatch 1.0 metamodel="tww-project-2"
+%liftpatch 1.0 syntax="LiftPatchShort"
 ```
 
 An unknown attribute is rejected with `UNKNOWN_PRAGMA_ATTRIBUTE`.
+
+The `syntax` attribute exists because the two surface syntaxes cannot be told
+apart from the text alone, and because getting it wrong is silent: a LiftPatchRef
+script read as a LiftPatchShort document matches no command line — every line
+begins with a verb, not with a command letter followed by a constrained second
+token — and is therefore read as pure prose, applying nothing and reporting
+nothing. Two further rules close that hole:
+
+- plan mode MUST report a warning for a document in which no line at all was recognized as a command (section "12.4");
+- implementations SHOULD use the extension `.liftpatch` for a LiftPatchRef script and `.liftpatchs` for a LiftPatchShort document.
 
 ### 1.2 The two surface syntaxes
 
@@ -77,9 +101,19 @@ LiftPatchShort commands are:
 
 - lines starting with optional whitespace followed by one of the single-letter command abbreviations, followed by whitespace and by a second token of a constrained shape. The recognition rule is normative and is given in Part 3, section "1.1"; a one-letter prefix alone is deliberately *not* sufficient, so that ordinary prose beginning with "c " or "s " is not mistaken for a command.
 - special instructions `language-default` and `language-create` 
-- the optional version pragma `%liftpatch 1.0`, on the first non-blank line of the document.
+- the optional version pragma `%liftpatch 1.0`, anywhere before the first command line of the document (section "1.1"). A pragma declaring a `sigil` is the one exception: it must be the first non-blank line.
 
-In both syntaxes, string are quoted by single or double quotes; a single quote is escaped as '' in a single-quoted string; double quote is escaped as \" in a double-quoted string.
+In both syntaxes, strings are quoted by single or double quotes. The escaping
+rules are the following, and they are exhaustive:
+
+- in a **double-quoted** string, `\"` is a double quote and `\\` is a backslash. These two are the only escape sequences: any other character following a backslash is an error (`SYNTAX_ERROR`), so that no sequence is silently reinterpreted later;
+- in a **single-quoted** string, `''` is a single quote and a backslash is an ordinary character with no escaping role;
+- a raw line break is forbidden inside a string in both syntaxes; there is no escape for it in version 1.0, and a value containing a line break cannot be written. (LiftPatchRef allows a command to span several physical lines, but not a string.)
+
+The `sigil` pragma attribute (section "1.1") is meaningful in LiftPatchShort
+documents only. In a LiftPatchRef script it is accepted and **ignored**: it is
+not an unknown attribute, and it does not make the script's lines subject to a
+prefix rule, since LiftPatchRef commands are recognized by their verb.
 
 ### 1.3 Structure of this document
 
@@ -87,7 +121,7 @@ In both syntaxes, string are quoted by single or double quotes; a single quote i
 - Part 2 describes the *LiftPatchRef* reference syntax.
 - Part 3 describes the *LiftPatchShort* concise syntax.
 - Appendix A gives the normative metamodel — component types, parentage, properties, required properties and natural identity — in a machine-readable form. Where a table of Part 1 and Appendix A diverge, Appendix A prevails.
-- Appendix B lists every error code with its kind, static or dynamic, and the codes withdrawn from earlier drafts.
+- Appendix B lists every error code with its kind, static or dynamic, the warnings, and the codes that a conforming implementation must not raise.
 - Appendix C gives the EBNF grammar of each of the two surface syntaxes.
 - Appendix D gives the conformance corpus: a machine-readable set of cases, each with a dictionary, a script and the expected outcome, which an implementation must pass to claim conformance.
 
@@ -150,7 +184,7 @@ The default language applies to:
 
 It does not apply to `clear`: on a multitext property, `clear` requires an
 explicit qualifier, either a language code or the wildcard `@*` (see section
-"5.5.3 Clearing").
+"5.5.3").
 
 ### 2.1.1 The `language-default` directive
 
@@ -201,7 +235,7 @@ with object = "tww", meta = "en" {
 
 - A `with` block binds one or both language kinds. A kind that is not bound keeps the binding it has in the enclosing scope.
 - The binding applies to every command in the block body, including nested blocks, and ends at the closing brace.
-- A `with` block is a scope, not a transaction of its own: it takes part in the atomicity of the enclosing block or script (see section "11").
+- A `with` block is a scope, and, like every block, also a transaction boundary (section "11"): it takes part in the atomicity of the enclosing block or script, and a failure inside its body rolls the body back and then fails the enclosing scope.
 - The language code named by a `with` binding must exist in the corresponding dictionary language list; otherwise `NO_SUCH_META_LANGUAGE` or `NO_SUCH_OBJECT_LANGUAGE` is raised.
 
 ### 2.1.3 Creating new languages
@@ -217,6 +251,12 @@ A language created by `language-create K` becomes the default language for kind
 K, with the same scope rules as a `language-default K` directive placed at the
 same position. It can be overridden afterwards by a `language-default` directive
 or by a `with` block.
+
+Two further points, because `language-create` is the one directive that changes
+the dictionary rather than only the state of the script:
+
+- the language it adds is added to the dictionary's language list, not to a scope: it remains after the end of the enclosing block, and after the end of the script;
+- it is nevertheless part of the script's transaction (section "12.2"). If any later command fails, the whole script is rolled back and the language is **not** created: "the dictionary is left exactly as it was before the script started" covers its language lists as well as its components.
 
 ## 3. Components and parentage
 
@@ -280,6 +320,14 @@ given parent, the children of each type form an ordered list; a child can be
 selected by its position **in the list of its same-type siblings** — not by its
 position among all the children of the parent — as described below in section
 "5.3.3 Ordinal selectors".
+
+The metamodel states which children a component type *may* have, and never how
+many it must have: there is no minimum cardinality anywhere in this language.
+Consequently a component may legitimately be left with no children of a type it
+allows — `delete all sense[...] under entry[...]` leaves an entry with no sense,
+and that is not an error. Whether such a state is desirable lexicography is a
+question for the editor, not for this language; whether the dictionary
+management system accepts it is a question for that system.
 
 ## 4. Properties
 
@@ -374,8 +422,7 @@ On all multitext properties, setting a language that does not exist in the
 corresponding dictionary language list should be rejected with
 `NO_SUCH_OBJECT_LANGUAGE` (for an object-language multitext) or
 `NO_SUCH_META_LANGUAGE` (for a meta-language multitext) — the same two codes as
-for the `language-default` directive and the `with` block (section "2.1"). The
-code `ILLEGAL_LANGUAGE` used by earlier drafts is withdrawn.
+for the `language-default` directive and the `with` block (section "2.1").
 
 - It is not required that all languages (metalanguages or object languages)
   existing in the dictionary have a corresponding lang-qualified value in a meta language
@@ -437,10 +484,10 @@ The qualifier `@*` denotes *every* language for which the multitext has a value.
 It is allowed only where a set of qualified values is meaningful:
 
 - in `clear`, where `clear definition@*` removes all the language values of `definition` (section "5.5.3");
-- in a filtering selector predicate, where:
-  - `p@* = V` matches a component having the value `V` for *at least one* language (qualified value) of `p`.
-  - `p@* != V` matches a component having the value `V` for *none* of the languages of `p`.
-  -  `p@* ~ V` matches a component having the value `V` matching *at least one* languages (qualified value) of `p`.
+- in a filtering selector predicate, where, writing `∃L` for "there is a language `L` for which `p` has a value":
+  - `p@* = V` matches a component for which `∃L. p@L = V` — the value `V` is present for *at least one* language of `p`.
+  - `p@* != V` matches a component for which `exists(p) ∧ ¬∃L. p@L = V` — `p` has at least one qualified value, and **none** of them is `V`. A component on which `p` is entirely unset does **not** match, exactly as with the scalar `p != V`, which also requires `p` to be set (section "5.1.2"). To match the unset case, write `absent(p)`; the language has no disjunction, so "unset or different from `V`" needs two commands.
+  - `p@* ~ V` matches a component for which `∃L. p@L` matches the regular expression `V` — at least one qualified value of `p` matches. `p@* ~i V` is the same, case-insensitively.
 
 `@*` is forbidden in `create`, `upsert`, `set` and `update` initializers and
 targets, which must designate exactly one qualified value; the error is
@@ -471,21 +518,36 @@ A *chain* links a step to its ancestors through an *axis*:
 
 ```text
 CHAIN ::= STEP { AXIS STEP }
-AXIS  ::= '/'    (strict parent, also written `of` / `under` / `on`)
-        | '//'   (existential parent, also written `within`)
+AXIS  ::= '/'    (written `of` / `under` / `on` in LiftPatchRef, where it is
+                  always the strict-parent axis; written `/` in LiftPatchShort,
+                  where which axis it denotes depends on its position in the
+                  path — see Part 3, section "4.1")
+        | '//'   (existential parent, always; also written `within`)
 ```
 
-`/` and `of`/`under`/`on` are the same axis, and `//` and `within` are the same
-axis; the keyword forms are the readable aliases used throughout Part 2, the
-operator forms are used in Part 3. The two forms may not be mixed inside one
-chain. The semantics of the two axes are given in sections "7.3" and "7.3".
+There are exactly **two axes**, and each has a keyword spelling used in Part 2 and
+an operator spelling used in Part 3:
+
+| Axis | Keyword spelling (Part 2) | Operator spelling (Part 3) | Semantics |
+|---|---|---|---|
+| strict parent | `of` / `under` / `on` | `/` | section "7.3" |
+| existential parent | `within` | `//` | section "7.4" |
+
+The keyword and operator spellings may not be mixed inside one chain. Two
+clarifications:
+
+- **`//` is always the existential axis. `/` is not always the strict one.** In LiftPatchRef, where the axis is written with a keyword, `of` / `under` / `on` is always strict and `within` always existential. In LiftPatchShort, the separator `/` denotes a link whose axis is fixed by its **position** in the path — strict immediately above the command target, existential everywhere else — under the positional rule of Part 3, section "4.1". `//` forces the existential axis where that rule would make the link strict.
+- **The two syntaxes write chains in opposite directions.** A LiftPatchRef chain is written *child first, ancestors after*: `sense[gloss@en = "pig"] of entry[form@tww = "mami"]` names the sense, then its parent. A LiftPatchShort path is written *ancestor first, descendants after*: `/e[f="mami"]/s[g="pig"]` names the entry, then its child. The two are the same chain. Whenever this document says "the step to the left" or "the step that follows", it is speaking of one syntax only, and says which; the syntax-independent formulation is "the parent step" and "the child step".
 
 We distinguish:
 
-- *unique selector* (or *unique selection*): selector that must match one value, which are of two sub-kinds:
-  - a *parent selector*: a selector appearing in an `of`, `under`, `on` or `within` clause (equivalently, on the right of a `/` or `//` axis);
-  - a *command selector*: the selector of the component directly targeted by a `delete`, `ensure`, `move` or `set`/`update`/`clear` command, or by the select branch of an `upsert` command;
-- a *filtering selector*: a selector appearing on the right of a `within` axis, or inside a `has` predicate. A filtering selector is not required to select a single component by itself.
+- *unique selector* (or *unique selection*): a selector that must match exactly one component. There are two sub-kinds:
+  - a *parent selector*: the selector of a component named as the parent of another, in an `of`, `under`, `on` or `within` clause (in Part 3: the parent side of a `/` or `//` link);
+  - a *command selector*: the selector of the component directly targeted by a `delete`, `ensure`, `move` or `set`/`update`/`clear` command, or by the select branch of an `upsert` command; the step of an `at before` / `at after` clause is also one (section "6.2.1");
+- a *filtering selector*: a selector that is not required to select a single component by itself. There are exactly three cases, and this list is exhaustive:
+  - the selector of a component on the **parent** side of a `within` / `//` axis;
+  - a step inside a `has` predicate;
+  - the target step of a command carrying a multiplicity keyword — `each`, `all`, or `*` in LiftPatchShort (section "5.6").
 
 #### 5.1.2 Predicates
 
@@ -520,6 +582,24 @@ agree on every script:
 - the subject is the single qualified value designated by the left-hand side, never the concatenation of several languages; with `p@*`, each qualified value is tested separately (section "4.4.1");
 - `~i` applies **Unicode simple case folding**, not ASCII-only lowercasing, so that `~i` behaves on Tuwuli, German or Greek data as it does on English. The regular expression is matched against the value as stored, without any other normalization; a script that must be robust against composed and decomposed forms should normalize its data, not rely on the matcher.
 
+**Which operator applies to which datatype.** An operator used on a datatype it
+does not fit is rejected with `OPERATOR_NOT_APPLICABLE_TO_DATATYPE`. This is a
+static error: the datatype of every property is given by the metamodel. The rule
+is:
+
+| Datatype | `=` | `!=` | `~`, `~i` | `exists`, `absent` |
+|---|---|---|---|---|
+| `string` | a quoted string | a quoted string | yes | yes |
+| `url` | a quoted string | a quoted string | yes | yes |
+| `integer` | an unquoted integer | an unquoted integer | no | yes |
+| `reference` | a chain or a label, never a string (section "10") | a chain or a label | no | yes |
+| multitext, qualified (`p@L`, `p@*`) | a quoted string | a quoted string | yes | yes |
+| multitext, unqualified (`p`) | the default language applies | the default language applies | the default language applies | yes — and here alone the unqualified form asks about the property as a whole |
+
+- A `url` is compared and matched as an ordinary string. This language performs **no** syntactic validation of URLs: `set url = "not a url"` is accepted, and reporting malformed URLs is the business of the dictionary management system, not of a mutation language. There is no error code for a malformed URL.
+- `~` and `~i` on an `integer` or a `reference` raise `OPERATOR_NOT_APPLICABLE_TO_DATATYPE` rather than matching a string rendering of the value, because the rendering would be an implementation detail.
+- The withdrawn code `OPERATOR_REQUIRE_A_MULTITEXT` (Appendix B.3) named a narrower version of this rule; `OPERATOR_NOT_APPLICABLE_TO_DATATYPE` replaces it and covers every datatype, while `exists()` and `absent()` remain applicable to all of them.
+
 The predicates restricted to filtering selectors are excluded from unique
 selection because they are, by construction, not uniquely identifying; using one
 of them in a command selector or in a `/` (`of`/`under`/`on`) parent selector
@@ -527,34 +607,39 @@ raises `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`.
 
 #### 5.1.3 Selection strategies for unique selection
 
-
-A command selector, and a parent selector on the `/` axis, are *unique selector* : it must select exactly
-one component. To make this checkable statically, such a selector MUST use
-exactly one of the following *selection strategies*. This list is exhaustive.
+A command selector, and a parent selector on the `/` axis, are *unique selector*
+: it must select exactly one component. To make this checkable statically, such
+a selector MUST use exactly one of the following *selection strategies*. This
+list is exhaustive.
 
 | # | Strategy | Written as | Applicable to |
 |---|---|---|---|
 | S1 | Label | `$name` | any component created and labelled earlier in the script |
 | S2 | Persistent identifier | `[id = "…"]` | `entry` and `sense` only |
-| S3 | Natural identity | all the properties of the natural identity property set of the component type, each given exactly once; a multitext identity property with exactly one language qualifier | every component type whose natural identity property set is non-empty |
+| S3 | Natural identity | all the properties of the natural identity property set of the component type, each given exactly once; a multitext identity property with exactly one language qualifier; OPTIONALLY refined by one or more `has` predicates | every component type whose natural identity property set is non-empty |
 | S4 | Entry lookup | a qualified `form` predicate, OPTIONALLY refined by **either** exactly one `hn` predicate **or** one or more `has` / `has-gloss` predicates | `entry` only |
 | S5 | Ordinal | `#n` (deprecated alias: `[index = n]`) | every component type except `entry` |
 
 Notes:
 
 - S3 is not applicable to `entry`, whose natural identity property set is empty (section "5.2"); S4 replaces it. S4 is not applicable to any other component type.
-- The refinements of S4 are part of S4, not separate strategies: `entry[form@tww = "mami", hn = 1]` uses one strategy, not two.
+- The refinements of S3 and S4 are part of the strategy, not separate strategies: `entry[form@tww = "mami", hn = 1]` uses one strategy, not two, and so does `sense[gloss@en = "pig", has example[text@tww ~ "jefi"]]`.
+- A `has` refinement is available on **every** component type, not only on `entry`. It is admitted in a unique selector because `has` can only ever narrow a candidate set, so it cannot make a unique selector less unique; because it is the disambiguator this specification recommends over `hn` (section "5.3.2.1"); and because without it there is no way to tell two same-type siblings apart by their content when their identity keys are defined for different languages.
+- `has-gloss` remains an `entry`-only shorthand (section "5.3.2.2"): on other component types, write the `has` predicate out.
 - S4 without refinement may still resolve to several entries (homophones); this raises `AMBIGUOUS_REFERENCE` like any other ambiguous selection.
-- The ordinal `#n` may not be combined with any predicate list.
+- The ordinal `#n` may not be combined with any predicate list, and no refinement applies to S1, S2 or S5.
 
 If a selector combines two strategies — for instance an `id` and a natural
-identity property, or an ordinal and a predicate list — the validator MUST
-reject it with `DUPLICATE_SELECTOR`. If it uses none — for instance an empty
-predicate list, or a predicate list that does not cover the whole natural
-identity property set — the validator MUST reject it with
+identity property, or the deprecated `[index = n]` predicate together with any
+other predicate — the validator MUST reject it with `DUPLICATE_SELECTOR`. If it
+uses none — for instance a predicate list that does not cover the whole natural
+identity property set, or a list made only of `has` predicates, which are a
+refinement and never a strategy on their own — the validator MUST reject it with
 `INCOMPLETE_SELECTOR`.
 
-A filtering selector is under none of these constraints: see section "5.1.4".
+`sense[gloss@en = "pig"]#2` is a syntax error (rejected by the parser).
+
+A *filtering selector*, by contrast with an unique selector, is under none of these constraints: see section "5.1.4".
 
 Example:
 
@@ -565,16 +650,22 @@ variant[type="dialectal", target = sense[id = "pig-44"]]
 media[url="http://www.example.org/Image.png"]
 entry[form@tww = "mami", has-gloss@en="pig"]
 entry[form@tww = "mami", has sense[gloss@en = "pig"]]
+sense[gloss@en = "pig", has example[text@tww ~ "jefi"]]
 example#1
 ```
 
+Of these, `entry[form@tww = "mami", has sense[...]]` is strategy S4 refined by a
+`has` predicate, and `sense[gloss@en = "pig", has example[...]]` is strategy S3
+refined by one, on a component type that is not an `entry`.
+
 #### 5.1.4 Filtering selectors
 
-A filtering selector (the right-hand side of `within`, and the step inside a
-`has` predicate) may contain:
+A filtering selector — one of the three cases listed in section "5.1.1": the
+parent side of a `within` / `//` link, a step inside a `has` predicate, or a
+target step marked `each` / `all` / `*` — may contain:
 
-- any property allowed on the component type, be it an identity property or not, in any number, with any of the predicate forms of section "5.1.2";
-- no pseudo-property: `id`, `hn`, `has-gloss` and the ordinal `#n` are forbidden there, and raise `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`.
+- any property allowed on the component type, be it an identity property or not, in any number, with any of the predicate forms of section "5.1.2", and, on a multitext, any number of qualified values and the wildcard `@*`;
+- no pseudo-property: `id`, `hn`, `has-gloss` and the ordinal `#n` are forbidden there, and raise `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`. The `has` predicate is not a pseudo-property in this sense and is allowed, including nested.
 
 A filtering selector may match zero, one, or several components; what must be
 unambiguous is the result of the whole chain, not the result of each step (see
@@ -584,7 +675,7 @@ section "7.4").
 
 A selector resolves to a set. The following rules are mandatory:
 
-1. An empty result raises `NOT_FOUND`.
+1. An empty result raises `NOT_FOUND`. The one exception is a target step carrying a multiplicity keyword (`each`, `all`, `*`), which succeeds on an empty result and applies the command to no component (section "5.6").
 2. When a unique result is required, more than one result raises `AMBIGUOUS_REFERENCE`.
 3. A command requiring one component must receive exactly one component, unless it carries an explicit multiplicity keyword (section "5.6").
 4. Component type and parent type compatibility are checked before dictionary lookup.
@@ -633,9 +724,15 @@ invariant identity: the gloss of a sense can be changed, which changes its
 identity key. The persistent identity is the `id` pseudo-property (section
 "5.3.1").
 
-In a selector, a multitext identity property must be given exactly one qualified
-value (section "5.5.2"). The following example is therefore rejected with
-`DUPLICATE_SELECTOR`, the sense being selected by two qualified values:
+In a **unique** selector (section "5.1.1"), a multitext identity property must be
+given exactly one qualified value (section "5.5.2"), because strategy S3 is an
+identity key for one language and two languages would be two keys. The
+restriction bears on unique selectors only: in a **filtering** selector, a
+multitext property may carry any number of qualified values and the wildcard
+`@*`, whether it is an identity property or not (section "5.4.1", roles R2 and
+R4). The following example is therefore rejected with `DUPLICATE_SELECTOR`, the
+sense being selected — in an `of` clause, on the strict axis — by two qualified
+values:
 
 ```text
 set text = "My field"
@@ -749,11 +846,7 @@ independent of how the dictionary computes it:
 **Matching rule.** A predicate `hn = N` in an entry selector matches the entry
 whose qualified `form` matches the accompanying `form` predicate and whose
 dictionary-assigned `hn` is exactly `N`. Whether that entry has homophones is
-irrelevant: it plays no part in the matching rule. (Earlier drafts of this
-specification required an error when the selected entry had no homophone; that
-rule is withdrawn, because it made the validity of a selector depend on entries
-that the selector does not mention, and made a script stop working when an
-unrelated homophone was deleted.)
+irrelevant: it plays no part in the matching rule. 
 
 **Usage rules.** Where `hn` may and may not appear is given by the table of
 section "5.4.2"; using it elsewhere raises `COMMAND_NOT_ALLOWING_HN`, or
@@ -774,7 +867,7 @@ of entry[form@tww = "mami", hn = 1]
 
 - if `hn` is used alone, without the `form` property, an error `HN_CANNOT_BE_USED_ALONE` is raised. This is a static error.
 - if the value given for `hn` is not an integer, or is lower than 1, an `ILLEGAL_HN` error is raised. This is a static error.
-- if no entry matches the combination of the `form` predicate and the `hn` predicate, a `HN_NOT_EXISTING` error is raised. This is a dynamic error.
+- if no entry matches the combination of the `form` predicate and the `hn` predicate, the ordinary selector error `NOT_FOUND` is raised (section "5.1.5", rule 1). This is a dynamic error. The `form` predicate and the `hn` predicate are one selector using one strategy (S4, section "5.1.3"), not two successive lookups, so "the form exists but not with this homophone number" is not a distinguishable condition: it is simply a selector that matched nothing.
 
 **Stability caveat.** Because the dictionary may reassign `hn` when a form is
 added or changed (see below), a script MUST NOT assume that an `hn` observed
@@ -926,7 +1019,7 @@ of entry[
 ]
 ```
 
-Another option could be to use `within`, as described in section "7.4" below:
+Another option could be to use `within`, that allows existential filtering, as described in section "7.4" below:
 
 ```LiftPatchRef
 create example(
@@ -936,13 +1029,13 @@ under sense[
   gloss@en = "pig"
 ]
 within entry[
-  form@tww = "mami",
+  form@tww = "mami"
 ]
 ```
 
 Where `has` and `has-gloss` may appear is given by the table of section "5.4.2";
 using either with a command that does not allow it, `create` in particular,
-raises `COMMAND_NOT_ALLOWING_HAS_GLOSS`, which is the only error code for that
+raises `COMMAND_NOT_ALLOWING_HAS`, which is the only error code for that
 condition. One consequence is specific to `upsert`: if its create branch runs,
 `has` / `has-gloss` is not taken into account, and an `entry` is created with the
 given form even if that produces a homophone (section "8.2.3").
@@ -958,10 +1051,12 @@ sense#2
 example#1
 ```
 
-Because the ordinal is a step suffix and not a predicate, it is structurally
-impossible to combine it with a predicate list: `sense[gloss@en = "pig"]#2` is a
-syntax error. This replaces the rule of earlier drafts, where `index` was a
-predicate that no other predicate could accompany.
+Because the ordinal is a step suffix and not a predicate, it cannot be combined
+with a predicate list in its `#n` form: `sense[gloss@en = "pig"]#2` is a syntax
+error. Its deprecated alias `[index = n]` *is* a predicate, and can therefore be
+written beside another one; that combination is not a syntax error but a
+`DUPLICATE_SELECTOR`, since it states two selection strategies (section
+"5.1.3").
 
 - The ordinal counts **same-type siblings only**: `example#2` is the second `example` child of its parent, whatever other children the parent may have.
 - The ordinal starts at 1.
@@ -971,10 +1066,9 @@ predicate that no other predicate could accompany.
 - If the ordinal is lower than 1, `ILLEGAL_ORDINAL` is raised (static error). If it is greater than the number of same-type siblings, `INDEX_OUT_OF_BOUNDS` is raised (dynamic error).
 - Ordinals are re-evaluated for each command, against the state of the dictionary left by the preceding commands. Two consecutive `delete example#1` under the same parent therefore delete two different components.
 
-For compatibility with earlier drafts, the predicate form `[index = n]` is
-accepted as a **deprecated** alias of `#n`, with exactly the same semantics and
-the same restrictions. It will be removed in a future version and SHOULD NOT be
-used in new scripts.
+The predicate form `[index = n]` is accepted as a **deprecated** alias of `#n`,
+with the same semantics. It will be removed in a future version and SHOULD NOT
+be used in new scripts.
 
 In the following example, the second sense in the sense list is selected:
 
@@ -1010,7 +1104,7 @@ at creation`, and `Datatype`. The six roles below form a partition: each
 (component, property) pair matches exactly one row, so the table yields a single
 verdict.
 
-| Role | `create` initializer | `upsert` initializer | selector of `ensure`, `delete`, `move`, and parent selector on the `/` axis | filtering selector (`within`, `has`) | `set` | `update` | `clear` |
+| Role | `create` initializer | `upsert` initializer | unique selector (the column of section "5.4.2": command selectors, including a property command's `on` step, and parent selectors on the `/` axis) | filtering selector (parent side of `within` / `//`, inside `has`, or a step marked `each` / `all` / `*`) | `set` | `update` | `clear` |
 |---|---|---|---|---|---|---|---|
 | **R1** identity, scalar | required | required | required (part of strategy S3) | allowed | allowed, subject to the uniqueness invariant | allowed, subject to the uniqueness invariant | forbidden — `CANNOT_CLEAR_IDENTITY_PROPERTY` |
 | **R2** identity, multitext | required, at least one qualified value | required, at least one qualified value | required (part of strategy S3), exactly one qualified value | allowed, any number of qualified values, `@*` allowed | exactly one qualified value, subject to the uniqueness invariant | exactly one qualified value, subject to the uniqueness invariant | `@L` only, and only if another qualified value remains; `@*` forbidden |
@@ -1022,46 +1116,36 @@ verdict.
 Reading rules:
 
 - "required" means: the command is rejected with `MISSING_REQUIRED_PROPERTY` (for `create` and `upsert`) or `INCOMPLETE_SELECTOR` (for a selector) if the property is absent.
-- "forbidden" in a selector column means that the predicate is rejected with `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`: a unique selector uses exactly one selection strategy (section "5.1.3") and carries no additional predicate.
+- "forbidden" in a selector column means that the predicate is rejected with `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`: a unique selector uses exactly one selection strategy (section "5.1.3") and carries no additional predicate, the only admitted supplement being the `has` refinement of strategies S3 and S4 and the `hn` refinement of S4, both of which are part of the strategy rather than additions to it.
 - R3 and R4 are "required" for `upsert` even though the select branch may make them unnecessary: which branch will run is not known statically, and the create branch must be able to satisfy section "6.1" rule 1.
 - The `clear` column implements one invariant: **a property that the metamodel declares required may never become unset**, and an identity property may never become unset. See the decision table in section "9.3.1".
 
 #### 5.4.2 Applicability of pseudo-properties and labels
 
-| | `create` initializer | `upsert` | selector of `ensure`, `delete`, `move`, and parent selector on the `/` axis | filtering selector (`within`, `has`) | `set` / `update` / `clear` target |
+Two columns of this table are easily confused and are kept apart deliberately:
+the **unique selector** column governs the *step* that names the component a
+command operates on, including the step of a property command's `on` clause,
+while the last column governs only the *property* a property command writes. The
+two have opposite verdicts — `set form = … on entry[id = "entry-42"]` is legal,
+`set id = …` is not.
+
+| | `create` initializer | `upsert` parenthesis | unique selector — the command selector of `ensure`, `delete`, `move` and of a property command's `on` step, the select branch of `upsert`, the step of `at before` / `at after`, and any parent selector on the `/` axis | filtering selector — parent side of `within` / `//`, inside `has`, or a step marked `each` / `all` / `*` | as the property **written** by `set` / `update` / `clear` |
 |---|---|---|---|---|---|
 | `id` | forbidden | forbidden — `ID_NOT_ALLOWED_ON_UPSERT` | allowed, alone, on `entry` and `sense` only | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
 | `hn` | forbidden | forbidden in the initializer list — `COMMAND_NOT_ALLOWING_HN`; allowed in the parent selector | allowed on `entry` only, together with `form` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
-| `has-gloss` | forbidden — `COMMAND_NOT_ALLOWING_HAS_GLOSS` | select branch only, on `entry`, together with `form`; never applied in the create branch | allowed on `entry` only, together with `form` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
-| `has STEP` | forbidden — `COMMAND_NOT_ALLOWING_HAS_GLOSS` | select branch only; never applied in the create branch | allowed | allowed, including nested | forbidden |
+| `has-gloss` | forbidden — `COMMAND_NOT_ALLOWING_HAS` | select branch only, on `entry`, together with `form`; never applied in the create branch | allowed on `entry` only, together with `form` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
+| `has STEP` | forbidden — `COMMAND_NOT_ALLOWING_HAS` | select branch only, on any component type; never applied in the create branch | allowed, on any component type, as a refinement of strategy S3 or S4 (section "5.1.3") | allowed, including nested | forbidden |
 | ordinal `#n` | forbidden | forbidden | allowed, alone, on every component type except `entry` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
-| label `$name` | not a predicate; introduced by `as $name` | not a predicate; introduced by `as $name` | allowed, as a whole step | forbidden | allowed, as the step of the `on` clause |
+| label `$name` | not a predicate; introduced by `as $name` | not a predicate; introduced by `as $name` | allowed, as a whole step, including as the step of an `on` clause | forbidden | forbidden |
 
-#### 5.4.3 (Deprecated) Command applicability table
+Three cells of this table are worth reading twice, because they are the ones that
+are easy to get wrong and each is exercised by the conformance corpus:
 
-> **Deprecated — superseded by the tables of sections "5.4.1" and "5.4.2", to be deleted later.**
->
-> The table below is kept only for comparison with earlier drafts. Its rows do
-> not form a partition (an optional non-identity multitext matches three of
-> them), its parent-selector column merges the `/` and `//` axes, which have
-> different rules, and several of its cells are contradicted by the prose. Where
-> it disagrees with sections "5.4.1" and "5.4.2", those sections prevail.
+- `id` and the ordinal are allowed as the step of an `on` clause: `set form = { tww: "mami" } on entry[id = "entry-42"]` and `set text@tpi = "…" on example#1 within sense[...]` are both legal (cases C-018 and C-031);
+- neither may be *written*: `set id = …`, `update hn = …`, `clear #2` are all forbidden, whatever the component type;
+- a label is a whole step and never a predicate, so `on $pig` is legal and `[label = $pig]` does not exist.
 
-| Property kind | `delete` | `move` | `create` | `upsert` | `ensure` | on parent selector (in `under`, `on`, `within` clause) | `set` | `update` | `clear` |
-|---|---|---|---|---|---|---|---|---|---|
-| Required identity property | required | required | required | required | required | allowed | allowed, subject to uniqueness | allowed, subject to uniqueness | only if the component remains valid |
-| Optional natural property | allowed | allowed | allowed | allowed; uses set semantics | forbidden | allowed only if part of identity | allowed | allowed if present | allowed |
-| Required non-identity property | required | required | required | allowed | forbidden | not allowed unless explicitly defined | allowed | allowed | only if another value remains |
-| Optional scalar property | forbidden | forbidden | allowed | allowed | forbidden | allowed only if declared identity | allowed | allowed if present | allowed |
-| Optional multitext property | forbidden | forbidden | one or more qualifiers | one or more qualifiers | forbidden | one qualifier only if identity | one qualifier | one qualifier | one qualifier or all qualifiers |
-| System-managed ID | allowed (for component where IDs are supported) alone | allowed (for component where IDs are supported) alone | forbidden | forbidden | forbidden | allowed (for component where IDs are supported); forbidden in `within` | forbidden | forbidden | forbidden |
-| `hn `| allowed only with `form` | allowed only with `form` | forbidden | allowed, but used only in the selector branch, and not used as initializer in the creation branch | forbidden | entry selector only, with `form`; forbidden with `within` | not as a property target | not as a property target | forbidden |
-| `has-gloss` | allowed with `form` | allowed with `form` | forbidden | allowed, but used only in the selector branch, not used as an initializer in the creation branch | forbidden | entry selector only, with `form`; forbidden in `within` | forbidden | forbidden | forbidden |
-| `index` | as sole selector only | as sole selector only | forbidden | forbidden | forbidden | as sole selector only; forbidden in `within` | forbidden | forbidden | forbidden |
-
-Here `allowed` does not mean that every property is valid on every component. Availability is first determined by the property availability table.
-
-### 5.5 Qualifier rules
+### 5.5 Language qualifier rules
 
 The language defines three distinct forms.
 
@@ -1108,23 +1192,34 @@ assignments, taken in the order of the literal, and it inherits all their rules
 (availability, default languages, uniqueness invariant, duplicate detection).
 
 - The property must be a multitext, otherwise `LANG_KEY_NOT_SUPPORTED_ON_SCALAR` is raised.
-- The property name must be written **without a qualifier**: `form = { … }`, never `form@tww = { … }`. A qualified name raises `QUALIFIER_ON_MULTITEXT_LITERAL` — the literal carries its own language keys, and a qualifier in front of it can only contradict them. (Earlier drafts raised `DUPLICATE_PROPERTY` here, which named the wrong condition: nothing is duplicated.) The wildcard form `form@* = { … }` raises `WILDCARD_NOT_ALLOWED`.
+- The property name must be written **without a qualifier**: `form = { … }`, never `form@tww = { … }`. A qualified name raises `QUALIFIER_ON_MULTITEXT_LITERAL` — the literal carries its own language keys, and a qualifier in front of it can only contradict them. The wildcard form `form@* = { … }` raises `WILDCARD_NOT_ALLOWED`.
 - Repeating a language inside one literal raises `DUPLICATE_PROPERTY`.
 - A multi-language literal is allowed wherever an assignment is allowed (`create`, `upsert`, `set`, `update` initializers and targets). It is **not** a selector predicate.
 
 #### 5.5.2 Qualified selection
 
-For selectors, an identity multitext property must use exactly one qualified value:
+In a **unique** selector (section "5.1.1"), an identity multitext property must
+use exactly one qualified value:
 
 ```text
 sense[gloss@en = "pig"]
 example[text@tww = "The dog ran"]
 ```
 
-An unqualified multitext identity property use the default object or meta language:
+An unqualified multitext identity property uses the default object or meta language:
 
 ```text
 sense[gloss = "pig"]    # equivalent to gloss@<default-meta-language>
+```
+
+In a **filtering** selector the restriction does not apply: any multitext
+property, identity or not, may carry several qualified values and the wildcard
+`@*`, and the predicates are combined by conjunction like any others (sections
+"5.1.4" and "5.4.1", roles R2, R4 and R6). Both of the following are legal:
+
+```text
+within sense[gloss@en = "pig", gloss@fr = "cochon"]    # filtering: both must match
+within sense[gloss@* = "pig"]                          # filtering: some language is "pig"
 ```
 
 #### 5.5.3 Qualifiers in `clear`
@@ -1138,11 +1233,10 @@ clear definition@*    # remove all language values
 clear definition      # ILLEGAL: MISSING_LANGUAGE_QUALIFIER
 ```
 
-Earlier drafts gave an unqualified `clear` the meaning now written `@*`, and
-had to state, as the single exception in the whole language, that the default
-language does not apply to it. That exception is withdrawn: the qualifier is
-mandatory, so there is nothing to default. On a scalar property, no qualifier is
-allowed and none is needed:
+The qualifier is mandatory, so there is nothing for the default language to
+apply to: `clear` is the one command to which section "2.1" does not extend, and
+it needs no exception because it addresses no single language implicitly. On a
+scalar property, no qualifier is allowed and none is needed:
 
 ```text
 clear category
@@ -1175,10 +1269,11 @@ set category = "Noun"
 - `all` and `each` are synonyms and have identical semantics. `all` reads better with `delete`, `each` with `set`, `update` and `clear`.
 - A multiplicity keyword is allowed **only** on the target step of `delete`, `set`, `update` and `clear`. It is forbidden on `create`, `upsert`, `ensure` and `move`, and on every parent step, where it raises `MULTIPLICITY_NOT_ALLOWED`.
 - A marked target step is a *filtering selector* (section "5.1.4"): it may carry any predicate, and it is not required to use a selection strategy. The steps above it in the chain are unaffected and keep their own rules.
-- The marked step may match one or several components. Matching none raises `NOT_FOUND`, as everywhere else in the language.
+- The marked step may match zero, one, or several components. **Matching none is not an error**: the command succeeds and applies to no component, producing no effect. This is the one place in the language where an empty result does not raise `NOT_FOUND` (section "5.1.5", rule 1), and it is deliberate: `all` and `each` say "however many there are", so a cleanup line such as `delete all example[text@tww ~ "^draft"]` must be runnable on a sense that happens to have no draft example, and a script that ends with such a line must be re-runnable. Raising `NOT_FOUND` here would make every `all` / `each` command require the editor to know the answer before asking the question.
+- The exemption covers the marked step **only**. The steps above it keep their ordinary rules, so a missing or ambiguous *parent* still raises `NOT_FOUND` or `AMBIGUOUS_REFERENCE`: in `delete all example[...] under sense[gloss@en = "pig"] of entry[form@tww = "mami"]`, the sense and the entry must each exist and be unambiguous, and only the set of examples may be empty.
 - The matched components are processed in document order: for a given parent, in the order of the same-type sibling list; parents themselves in document order.
-- The command remains atomic: either every application succeeds, or the command has no effect.
-- Every per-component rule still applies to every application. `delete all` therefore deletes each matched component with its descendants, and `set ... on each` must preserve the uniqueness invariant for every component it touches.
+- The command remains atomic: either every application succeeds, or the command has no effect. A command that applies to no component trivially succeeds.
+- Every per-component rule still applies to every application. `delete all` therefore deletes each matched component with its descendants, and `set ... on each` must preserve the uniqueness invariant for every component it touches. This cuts both ways for `update`: `update definition@fr = "…" on each sense[...]` fails as a whole — and changes nothing — as soon as one matched sense has no French definition, since `update` requires its target to be set (section "9.2"). Use `set` for "wherever it applies", or narrow the step with `exists(definition@fr)`.
 
 Without a multiplicity keyword, a target step matching more than one component
 raises `AMBIGUOUS_REFERENCE`, unchanged.
@@ -1248,7 +1343,7 @@ AT-CLAUSE ::= 'at' 'beginning'
             | 'at' 'after' STEP
 ```
 
-- The index is 1-based and counts same-type siblings only. The valid insertion range is `1..count+1`; outside it, `INDEX_OUT_OF_BOUNDS` is raised (see 8.5).
+- The index is 1-based and counts same-type siblings only. The valid insertion range is `1..count+1`. An index **lower than 1** is decidable from the text of the command and raises `ILLEGAL_ORDINAL`, a static error, exactly as the ordinal `#0` does (section "5.3.3"); an index **above the upper bound** depends on the dictionary and raises `INDEX_OUT_OF_BOUNDS`, a dynamic error (see 8.5).
 - `at before STEP` and `at after STEP` place the component relative to an existing same-type sibling. These forms are RECOMMENDED over `at index n`, which breaks as soon as the sibling list changes.
 - **When the `at` clause is omitted, the component is created at the last position**, exactly as with `at end`.
 - The `at` clause is available on `create`, on `upsert` (where it applies only if the create branch runs), on an embedded initializer, and on a command written inside a block. It is mandatory on `move` (section "8.5"), which has no default.
@@ -1264,7 +1359,7 @@ step, under rules that are stated here rather than in section "5.1" because they
 apply nowhere else:
 
 - The step is resolved **among the same-type siblings under the destination parent**, and nowhere else: it is not a chain, it takes no axis, and it never leaves that sibling list.
-- Its component type, when written, must be the type of the component being placed; it may also be omitted in the concise syntax (Part 3, section "5.3"). A different type raises `ILLEGAL_PARENT`.
+- Its component type, when written, must be the type of the component being placed; it may also be omitted in the concise syntax (Part 3, section "5.3"). A different type is a `SYNTAX_ERROR`: no parentage is in question — both components would be legal children of the same parent — and what is wrong is the command, which names a sibling list the component being placed does not belong to.
 - It must resolve to **exactly one** sibling: `NOT_FOUND` if none matches, `AMBIGUOUS_REFERENCE` if several do.
 - Because it must resolve uniquely, it obeys the rules of a *command selector* (section "5.1.3"): one selection strategy, no additional predicate, and none of the filtering-only predicates (`!=`, `~`, `~i`, `exists`, `absent`), which raise `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`. The ordinal strategy is the usual one here: `at after #2`.
 - On `move`, the step is resolved **before** the moved component is removed from its list. A step that denotes the moved component itself asks for the position it already occupies, and raises `MOVING_TO_CURRENT_POSITION`.
@@ -1276,19 +1371,26 @@ later commands refer to it directly instead of selecting it again:
 
 ```text
 create COMPONENT(initializers) [under PARENT] [at POSITION] as $NAME
-upsert  COMPONENT(initializers) [under PARENT] [at POSITION] as $NAME
+upsert COMPONENT(initializers) [under PARENT] [at POSITION] as $NAME
+ensure COMPONENT[SELECTOR]     [under PARENT]               as $NAME
+COMPONENT[SELECTOR] [of PARENT ...] as $NAME { ... }          # block header
 ```
 
 ```LiftPatchRef
 create entry(form@tww = "mami") as $newEntry
 
-create relation(type = "synonym", target = $newEntry)
+create relation(type = "variant", target = $newEntry)
   under entry[form@tww = "memi"]
 ```
 
 - A label name is written `$` followed by a letter and then letters, digits, `-` or `_`.
-- A label is bound by `create` (to the created component) or by `upsert` (to the created or resolved component). No other command binds a label.
-- A label may be used wherever a step is expected on the `/` axis — as a command target, as a parent in `under`, `of` or `on`, or as the value of a `reference` property. It is forbidden on the `//` axis and in filtering selectors, where it would be pointless: a label already denotes exactly one component.
+- A label is bound by a command or header that resolves or creates **exactly one** component, and by no other:
+  - `create`, to the component it creates;
+  - `upsert`, to the component it creates or resolves;
+  - `ensure`, to the component it asserts. `ensure` resolves exactly one component and fails loudly otherwise, which is precisely the precondition one wants before reusing a name, so `ensure sense[gloss@en = "pig"] under entry[...] as $pig` both checks and names in one line;
+  - a **block header**, to the component that heads the block — whether the header is a selector chain, a `create`, an `upsert` or an `ensure` (section "11"). A `with` header binds no label, since it designates no component.
+- `delete`, `move`, `set`, `update` and `clear` bind no label. `delete` and `move` do not, because a label must keep denoting one component for the rest of its scope; the property commands do not, because they may carry `each`.
+- A label may be used wherever a step is expected on the `/` axis — as a command target, as a parent in `under`, `of` or `on` (in LiftPatchShort: as a path step, including the first), or as the value of a `reference` property. It is forbidden as the **parent side** of a `//` (`within`) link and inside a filtering selector, where it would be pointless: a label already denotes exactly one component, so there is nothing for an existential join to choose among. `$pig/x[t="a mami jefi"]` is therefore legal and `$pig//x[t="a mami jefi"]` is a syntax error.
 - A label denotes a component, not a selector: it is not re-resolved, and it keeps denoting the same component even if the properties used to create it are afterwards modified.
 - Scope: a label is visible from its binding command to the end of the enclosing block, or to the end of the script if it is bound at top level. Re-binding a visible name raises `DUPLICATE_LABEL`; using an unbound name raises `UNKNOWN_LABEL`. Both are static errors.
 - If the command that binds a label is rolled back, the label is unbound.
@@ -1326,8 +1428,8 @@ delete [all] COMPONENT[SELECTOR] under PARENT
 move COMPONENT[SELECTOR] under SOURCE-PARENT under DESTINATION-PARENT at POSITION
 move COMPONENT[SELECTOR] under PARENT at POSITION
 
-ensure entry[SELECTOR]
-ensure COMPONENT[SELECTOR] under PARENT
+ensure entry[SELECTOR] [as $LABEL]
+ensure COMPONENT[SELECTOR] under PARENT [as $LABEL]
 ```
 
 `entry` differs from every other component type in three ways, all of which
@@ -1363,7 +1465,7 @@ any doubt about which one to use:
 |---|---|---|---|---|---|
 | `create` | creates it | `CANNOT_CREATE_DUPLICATE` | yes | no | yes |
 | `upsert` | creates it, then applies the non-identity initializers | resolves it, then applies the non-identity initializers with `set` semantics | yes | yes | yes |
-| `ensure` | `NOT_FOUND` | succeeds, changes nothing | no | no | no |
+| `ensure` | `NOT_FOUND` | succeeds, changes nothing | no | no | yes |
 | `delete` | `NOT_FOUND` | removes it with its descendants | no | yes | no |
 | `move` | `NOT_FOUND` | changes its position or its parent | no | yes | no |
 
@@ -1375,9 +1477,13 @@ And for the three property commands:
 | `update` | `UNSET_QUALIFIED_PROPERTY` / `UNSET_PROPERTY` | replaces the value |
 | `clear` | see the decision table of section "9.3.1" | removes the value, subject to the invariants of section "5.5.3" |
 
-"Component absent" and "component present" are decided by the natural identity
-of the component type (section "5.2"), against the siblings under the resolved
-parent. Each verb is defined in full in sections "8" and "9".
+"Component absent" and "component present" are decided differently by the two
+groups of verbs, and the difference matters:
+
+- for `create` and `upsert`, which are written with an **initializer list**, presence is decided by the **natural identity** of the component type (section "5.2"), against the same-type siblings under the resolved parent;
+- for `ensure`, `delete` and `move`, which are written with a **selector**, presence is decided by that selector and by whichever selection strategy it uses (section "5.1.3") — which may be a label, an `id`, an ordinal, or an `hn`-refined form lookup, none of which is a natural identity. `delete sense[id = "s-41"]` finds its component or raises `NOT_FOUND` without consulting any identity key.
+
+Each verb is defined in full in sections "8" and "9".
 
 For all *property commands*, if the command refers to a property that does not exist on its parent type according to the table in section "4.1", an error 'PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE' is raised.
 
@@ -1388,6 +1494,12 @@ For all eight commands, PARENT refers to the parent component of the targeted pr
 - `under` identifies the immediate parent of a component directly targeted by a `component command` (create, move, upsert, ensure, delete)
   - there is no `under` clause when the target of the command is an entry, since an entry is at the root of the hierarchy and has no parent
 - `on` identifies the immediate parent of a property directly targeted by a property command (set, update, clear)
+
+The clause is **mandatory** in every other case, and a command that omits it is
+rejected with `MISSING_PARENT_CLAUSE`, a static error: `create sense(gloss@en =
+"pig")` and `set category = "Noun"` name no parent and there is nowhere for them
+to act. The one place where the clause is omitted is the body of a block, whose
+header supplies the parent (section "11").
 
 ### 7.3 Further ancestors: `of`
 
@@ -1402,6 +1514,8 @@ existential filtering (`within`, section "7.4").
 - Multiple such clauses can be chained together, and the two keywords may alternate freely. Every `of` or `within` selector must be a parent of the previous component.
 - either the component after `on` or `under`, or the component after the last clause of the chain must be an entry
 - skipped ancestors are not allowed
+- a chain that **stops before reaching an `entry`** is rejected with `INCOMPLETE_ANCESTOR_CHAIN`. This is a static error: it depends only on the component types written in the command and on the metamodel, not on the dictionary. `set category = "Noun" on sense[gloss@en = "pig"]`, with no `of` or `within` clause, is therefore rejected before any lookup;
+- a chain in which two adjacent steps name component types that the metamodel does not relate as parent and child is rejected with `ILLEGAL_PARENT`, the code section "3" gives to every impossible parentage. **Skipping a level is this error, not the previous one**: in `on example[...] of entry[...]` the sense is missing, and what the command actually states is that an `example` is a child of an `entry`, which the hierarchy of section "3" forbids.
 - `of`, `under` and `on` are the three keyword spellings of the same axis, the strict-parent axis, written `/` in Part 3. Which keyword is used depends only on the position in the command, never on the semantics: `under` before the immediate parent of a component command, `on` before the immediate parent of a property command, `of` before every further ancestor.
 
 #### 7.3.1 An `of` clause followed by a `within` chain
@@ -1442,7 +1556,8 @@ still a selector on the `/` axis, and it keeps every rule of section "5.1.3": on
 selection strategy, no additional predicate, and none of the filtering-only
 predicates of section "5.1.2", which raise
 `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR` there as anywhere else. Only the
-selectors written *to the right of a `within`* are filtering selectors. So:
+selectors written on the *parent side* of a `within` — to its right, in this
+syntax — are filtering selectors. So:
 
 ```LiftPatchRef
 set category = "Verb"
@@ -1551,9 +1666,9 @@ Two consequences follow, and they are what distinguishes `within` from `of`:
 - an individual `within` selector may match several components, and may use any property of the component, identity property or not (it is a *filtering selector*, section "5.1.4"). Only the result of the chain must be unique;
 - a `within` clause never creates anything: it is a selector constraint, and a missing ancestor makes the command fail rather than be created (section "7.4.6").
 
-Two further errors can end a `within` chain: `ILLEGAL_PARENT`, when the
-components named cannot be related according to the hierarchy of section "3",
-and `DUPLICATE_SELECTOR`, when the same ancestor constraint is written twice.
+One further error can end a `within` chain: `ILLEGAL_PARENT`, when two adjacent
+components named in it cannot be related as parent and child according to the
+hierarchy of section "3".
 
 
 For instance, the following example contains a chain of two within clause 
@@ -1795,6 +1910,7 @@ upsert sense(
   gloss@en = "pig",
   gloss@fr = "porc"
 )
+under entry[form@tww = "mami", hn = 1]
 ```
 
 #### 8.1.1 Creating an `entry`
@@ -1850,7 +1966,7 @@ Let `T` be the component type, `P` the resolved parent, and let the parenthesize
 list be split into three disjoint parts:
 
 - `K` — the *match part*: the predicates bearing on the properties of the natural identity property set `I(T)`;
-- `D` — the *disambiguation part*: the `has` / `has-gloss` predicates, which may be present only for `entry`;
+- `D` — the *disambiguation part*: the `has` and `has-gloss` predicates. `has` may be present for **any** component type; `has-gloss`, being an `entry`-only shorthand (section "5.3.2.2"), only for `entry`;
 - `A` — the *assignment part*: every other initializer.
 
 The command is then:
@@ -1864,7 +1980,31 @@ The command is then:
 meaningless as an initializer, since the entry being created has no sense yet.
 That asymmetry is intended, and it is the reason why pseudo-predicates are
 admitted in an `upsert` parenthesis at all, while they are rejected in a
-`create` parenthesis.
+`create` parenthesis. The same reasoning applies below the entry: 
+
+```LiftPatchRef
+upsert sense(gloss@en = "pig", has example[text@tww ~ "jefi"], category = "Noun")
+  under entry[form@tww = "mami", hn = 1]
+```
+
+resolves the sense whose gloss is "pig" **and** which already carries an example
+mentioning "jefi", and creates a plain `sense(gloss@en = "pig", category = "Noun")`
+— with no example, since `D` is never applied — if no such sense exists.
+
+One consequence of that last clause must be understood before using `D` on a
+component type whose natural identity property set is **not** empty. `D` narrows
+the match but takes no part in the creation, so a `D` that excludes an existing
+sibling with the same identity key sends the command to the create branch, where
+the uniqueness invariant then refuses it:
+
+- under an entry that has a sense glossed "pig" **with** a "jefi" example, the command above takes the select branch and sets `category`;
+- under an entry that has a sense glossed "pig" **without** such an example, `M` is empty, the create branch runs, and it fails with `CANNOT_CREATE_DUPLICATE`, because two senses under one entry may not share `gloss@en`.
+
+That is the correct outcome — the script asked for a sense that does not exist,
+and the one that does exist cannot be duplicated — but it means `D` is a
+*disambiguator* on types where several same-identity siblings are possible (i.e.
+`entry`, section "8.2.3") and a *precondition* on every other type. Where a
+precondition is what is wanted, `ensure` states it more clearly.
 
 Further rules:
 
@@ -1909,14 +2049,14 @@ otherwise. It never creates anything, never modifies anything, and has no
 initializer list:
 
 ```text
-ensure entry[SELECTOR]
-ensure COMPONENT[SELECTOR] under PARENT
+ensure entry[SELECTOR] [as $LABEL]
+ensure COMPONENT[SELECTOR] under PARENT [as $LABEL]
 ```
 
 Because it selects and does not create, `ensure` uses **square brackets**, like
 every other selecting construct of the language, and it obeys exactly the rules
-of a command selector (section "5.1.3"): one selection strategy, no extra
-predicate.
+of a command selector (section "5.1.3"): one selection strategy, with its
+refinements and nothing else.
 
 ```LiftPatchRef
 ensure sense[gloss@en = "pig"]
@@ -1931,14 +2071,21 @@ The ordinary selector errors apply, and nothing else: `NOT_FOUND` when nothing
 matches, `AMBIGUOUS_REFERENCE` when several do, success and no change when
 exactly one does (section "5.1.5"). Two points are specific to `ensure`:
 
-- it accepts every selection strategy, including `id`, `hn`, `has` / `has-gloss` and the ordinal `#n`, and it may target any component type, `entry` included: since it does not create, the empty natural identity property set of `entry` is irrelevant to it;
-- it takes no `at` clause and binds no label.
+- it accepts every selection strategy, including `id`, `hn`, `has` / `has-gloss` and the ordinal `#n`, and it may target any component type, `entry` included: since it does not create, the empty natural identity property set of `entry` is irrelevant to it. This holds for `hn` too: an `hn` that matches no entry raises `NOT_FOUND` like any other selector that matched nothing (section "5.3.2.1");
+- it takes no `at` clause;
+- it **binds a label** (`as $NAME`, section "6.3") when one is written. `ensure` resolves exactly one component, so the label is well defined, and asserting a precondition and naming its subject in the same line is the command's most useful form:
+
+```LiftPatchRef
+ensure entry[form@tww = "mami", has-gloss@en = "pig"] as $mami
+ensure sense[gloss@en = "pig"] under $mami as $pig
+
+set definition@en = "A four-legged terrestrial animal" on $pig
+create example(text@tww = "a mami jefi") under $pig
+```
 
 Writing `ensure sense(gloss@en = "pig")` — with parentheses — is a **syntax
-error**. Earlier drafts described `ensure` as "an idempotent upsert that does not
-change existing properties", which made it a creating command; that description
-is withdrawn. A command that creates a component if it is missing is spelled
-`upsert`.
+error**: parentheses create, and `ensure` does not. A command that creates a
+component if it is missing is spelled `upsert`.
 
 The typical use of `ensure` is to state a precondition at the top of a script,
 so that the whole script is rejected before any change is made if the dictionary
@@ -1978,7 +2125,10 @@ delete all example[text@tww ~ "^draft"]
 
 The marked step is a filtering selector: it may carry any predicate, it may
 match several components, and each matched component is deleted with its
-descendants. Matching none still raises `NOT_FOUND`.
+descendants. Matching **none** is not an error: the command succeeds and deletes
+nothing (section "5.6"), so the line above is safe to run on a sense that has no
+draft example. The parent clauses are unaffected: the sense and the entry must
+still exist and be unambiguous.
 
 ### 8.5 The `move` command
 
@@ -2029,16 +2179,16 @@ move example#1
 A move fails with a structured error if:
 
 - moving to the current position raises `MOVING_TO_CURRENT_POSITION`
-- the destination cannot contain the source component type: `ILLEGAL_PARENT`, the same code as for any other illegal parentage (section "3"); the code `INCOMPATIBLE_DESTINATION` used by earlier drafts is withdrawn
+- the destination cannot contain the source component type: `ILLEGAL_PARENT`, the same code as for any other illegal parentage (section "3")
 - the move would make a component its own ancestor (`SELF_ANCESTOR`);
-- the requested position is outside the destination's valid range (an error `INDEX_OUT_OF_BOUNDS` is raised):
-  - lower than 1 
+- the requested position is **above** the destination's valid range, which raises `INDEX_OUT_OF_BOUNDS`:
   - greater than the number of components in the destination + 1 for a different-parent move
   - greater than the number of components in the destination for a same-parent move
-Moving an `entry` is not one of these runtime conditions: `move entry[...]` is
+- a position **lower than 1** is not a runtime condition at all: it is decidable from the text and raises the static `ILLEGAL_ORDINAL` (section "6.2").
+
+Moving an `entry` is likewise not a runtime condition: `move entry[...]` is
 rejected by the parser as a syntax error, since `entry` has no parent and no
-sibling order to change. The code `ENTRY_CANNOT_MOVE` used by earlier drafts is
-withdrawn.
+sibling order to change.
 
 A move also fails if it would break the uniqueness invariant of section "5.2"
 under the destination parent: `CANNOT_CREATE_DUPLICATE`.
@@ -2236,10 +2386,8 @@ clear definition@fr
 
 The following table is normative and exhaustive. It gives, for every
 combination of property role (section "5.4.1"), qualifier, and current state of
-the property, either the effect of the command or the error it raises. It
-supersedes the scattered rules of earlier drafts, which named three different
-errors (`UNSET_PROPERTY`, `QUALIFIED_PROPERTY_NOT_FOUND`, `EMPTY_MULTITEXT`) for
-overlapping situations.
+the property, either the effect of the command or the error it raises. It is the
+only place where the outcome of a `clear` is decided.
 
 | Property role | Written as | State of the property | Result |
 |---|---|---|---|
@@ -2262,10 +2410,6 @@ Two invariants are behind the whole table:
 
 1. A property that the metamodel declares required, and any identity property, may never become unset. `clear` is refused rather than allowed to produce a component that `create` would have rejected.
 2. `clear` never removes a component. To remove a component, use `delete`.
-
-The codes `QUALIFIED_PROPERTY_NOT_FOUND` and `EMPTY_MULTITEXT` used by earlier
-drafts are withdrawn; `UNSET_QUALIFIED_PROPERTY` and `UNSET_PROPERTY`
-respectively replace them.
 
 #### 9.3.2 The table applied to real properties
 
@@ -2311,9 +2455,34 @@ REFERENCE-VALUE ::= CHAIN | '$' LABEL
 
 ```LiftPatchRef
 set target = entry[form@tww = "memi"]
-on relation[type = "synonym"]
+on relation[type = "synonym", target = entry[form@tww = "moni"]]
 of entry[form@tww = "mami"]
 ```
+
+**The selector of a `relation`, a `variant` or a `reversal` must name its current
+target.** The natural identity property set of all three is `type + target`
+(section "4.1"), so strategy S3 requires both properties, and a command that
+rewrites a `target` has to say which link it is rewriting. Writing
+`on relation[type = "synonym"]` alone is `INCOMPLETE_SELECTOR`: `type` is half an
+identity key, and an entry may carry several `synonym` relations. Three spellings
+are available, and the second is usually the shortest:
+
+```LiftPatchRef
+set target = entry[form@tww = "memi"]
+  on relation[type = "synonym", target = entry[form@tww = "moni"]]   # by identity
+  of entry[form@tww = "mami"]
+
+set target = entry[form@tww = "memi"]
+  on relation#1                                                      # by position
+  of entry[form@tww = "mami"]
+
+create relation(type = "synonym", target = entry[form@tww = "moni"])
+  under entry[form@tww = "mami"] as $link                            # by label
+set target = entry[form@tww = "memi"] on $link
+```
+
+Note that `relation`, `variant` and `reversal` carry no `id` (section "5.3.1"
+gives one to `entry` and `sense` only), so strategy S2 is not available on them.
 
 A relation to a sense may be written:
 
@@ -2321,7 +2490,7 @@ A relation to a sense may be written:
 set target =
   sense[gloss@en = "pig"]
   of entry[form@tww = "memi"]
-on relation[type = "associated-sense"]
+on relation#2
 of entry[form@tww = "mami"]
 ```
 
@@ -2353,8 +2522,8 @@ Two consequences are worth stating:
 
 When a reference is **assigned**, the validator further verifies that:
 
-- the value resolves to an existing component; otherwise `NO_SUCH_TARGET` is raised;
-- that component is an entry or a sense; otherwise `INVALID_TARGET` is raised.
+- the value resolves to exactly one existing component. This is the ordinary resolution of a chain (section "5.1.5"), so a chain matching nothing raises `NOT_FOUND` and one matching several raises `AMBIGUOUS_REFERENCE`; a reference target needs no error code of its own;
+- the component designated is an `entry` or a `sense`; otherwise `INVALID_TARGET` is raised. This is a **static** error, not a dynamic one: the component type is written in the step that designates it — the leftmost step of a LiftPatchRef chain, the last step of a LiftPatchShort path — or, for a label, is known from the command that bound it. `set target = example[text@tww = "a mami jefi"] of …` is rejected before the dictionary is consulted.
 
 These rules apply to the `target` property of the three component types that
 carry one: `variant`, `relation` and `reversal`. Since `type + target` is the
@@ -2372,15 +2541,16 @@ A curly brace block is a syntactic construct that groups related commands togeth
 A block consists of
 - the *block header* which is given before the curly brace.
   - the block header is either:
-    - a component with a selector, possibly extended by `of` / `within` clauses
+    - a component with a selector, possibly extended by `of` / `within` clauses, and possibly with an `as $LABEL` binding
     - a `create` or `upsert` command with a component and its initializer list, possibly with an `at` clause and an `as $LABEL` binding
-    - an `ensure` command with a component and its selector (the assertion is evaluated first; the asserted component is then the parent of the body)
+    - an `ensure` command with a component and its selector, possibly with an `as $LABEL` binding (the assertion is evaluated first; the asserted component is then the parent of the body)
     - a `with` directive (section "2.1.2"), which binds default languages for the body without designating a parent; the parent is then the one of the enclosing block, if any
 - the *block body* which is given inside the curly brace. The block body contains either:
   - another block, with its header and body: block can be nested
   - one or several commands. Those commands have neither an `under` nor an `on` clause, since the parent is given by the block header. They may carry an `at` clause, an `as $LABEL` binding, and a multiplicity keyword, exactly as at top level.
   - `language-default` directives, whose scope is then the block (section "2.1.1").
   - Note that an `upsert`, `ensure` or `update` cannot be in the scope of a `create` command, be it at the direct upper level or indirectly related.
+  - **`create entry(...)` cannot appear in a block body.** A block header supplies a parent, and an `entry` has none (section "2"); the two statements cannot both be honoured. The verdict is `ILLEGAL_PARENT`, the same code as for any other impossible parentage, and it is a static error. An entry is created at top level, and the block that fills it is then written with that `create entry` as its own header.
   - **`move` cannot appear in a block body** (`MOVE_NOT_ALLOWED_IN_BLOCK`, a static error). A `move` names two parents — the source parent and the destination parent — while a block header supplies exactly one, and a block body command takes no `under` clause with which to supply the other. Rather than give `move` a special dispensation to carry one `under` clause inside a block, the language keeps the rule simple: a `move` is written at top level, where both of its parents are visible in the command itself.
 
 The semantic of the relation between the block header and the command it contains is that of `under` and `on`: the block header is the parent of the component or property targeted by the inner commands.
@@ -2471,11 +2641,18 @@ Block semantics are:
 5. Roll back the entire block if any child command fails.
 
 Inside a component block, a property command omits `on` and uses the current
-block component as its parent. Outside a block, `on` is mandatory for property commands.
+block component as its parent. Outside a block, `on` is mandatory for property
+commands, and `under` for every component command whose target is not an `entry`;
+omitting it raises `MISSING_PARENT_CLAUSE` (section "7.2").
 
 A block is also a *scope*: `language-default` directives and `as $LABEL`
 bindings made inside it are visible until its closing brace and not beyond
-(sections "2.1.1" and "6.3").
+(sections "2.1.1" and "6.3"). A label bound by the block **header** is bound in
+the *enclosing* scope, not in the body's: it is visible inside the body, and it
+remains visible after the closing brace — to the end of the enclosing block, or
+to the end of the script for a top-level block. This is what makes a header
+label useful, since its purpose is to let later commands reach the component the
+block was about without selecting it again.
 
 Blocks are not loops or conditionals. They provide lexical nesting, a scope for
 defaults and labels, and a transaction boundary.
@@ -2509,8 +2686,8 @@ The unit of atomicity is the **whole script**:
 Errors are of two kinds, and an implementation MUST report all the static errors
 of a script before applying any command:
 
-- **Static errors** depend only on the text of the script and on the metamodel: unknown component or property name, property not available on the component type, illegal parentage, wrong selection strategy, forbidden pseudo-property, missing required initializer, `ILLEGAL_HN`, `ILLEGAL_ORDINAL`, `DUPLICATE_PROPERTY`, `DUPLICATE_LABEL`, `UNKNOWN_LABEL`, and every syntax error.
-- **Dynamic errors** depend on the state of the dictionary: `NOT_FOUND`, `AMBIGUOUS_REFERENCE`, `CANNOT_CREATE_DUPLICATE`, `UNSET_PROPERTY`, `UNSET_QUALIFIED_PROPERTY`, `HN_NOT_EXISTING`, `INDEX_OUT_OF_BOUNDS`, and the `clear` invariants.
+- **Static errors** depend only on the text of the script and on the metamodel: unknown component or property name, property not available on the component type, illegal parentage, wrong selection strategy, forbidden pseudo-property, missing required initializer, an operator applied to a datatype that does not admit it, a reference target that is neither an entry nor a sense, an ancestor chain that does not reach the root, a missing parent clause, `ILLEGAL_HN`, `ILLEGAL_ORDINAL`, `DUPLICATE_PROPERTY`, `DUPLICATE_LABEL`, `UNKNOWN_LABEL`, and every syntax error.
+- **Dynamic errors** depend on the state of the dictionary: `NOT_FOUND`, `AMBIGUOUS_REFERENCE`, `CANNOT_CREATE_DUPLICATE`, `UNSET_PROPERTY`, `UNSET_QUALIFIED_PROPERTY`, `INDEX_OUT_OF_BOUNDS`, `MOVING_TO_CURRENT_POSITION`, `SELF_ANCESTOR`, the language-list errors of section "2.1", and the `clear` invariants.
 
 Appendix B gives the kind of each error code.
 
@@ -2533,6 +2710,15 @@ A script that reports no error in plan mode is guaranteed to be free of static
 errors; it is not guaranteed to succeed later, since the dictionary may have
 changed in between.
 
+Plan mode MUST also report **warnings**, which are not errors and do not prevent
+the script from being applied. Two are defined in version 1.0:
+
+- `NO_COMMAND_RECOGNIZED` — not one line of the document was recognized as a command. In LiftPatchShort this is almost always a misdetected syntax: a LiftPatchRef script read as a LiftPatchShort document matches no command line and would otherwise apply nothing, silently (section "1.1"). Declaring `syntax=` on the pragma prevents the situation; the warning catches it when nobody did;
+- `COMMAND_APPLIES_TO_NO_COMPONENT` — a command marked `each`, `all` or `*` whose target step matched nothing. It changes nothing by design (section "5.6"), and a plan that says so is how an editor learns that the cleanup line they wrote matches none of the data they thought it did.
+
+Warnings are reported per document and per operation respectively, and are
+carried by the plan document in a `warnings` array (section "12.4.1").
+
 #### 12.4.1 The plan document
 
 A prose rendering is what a lexicographer reads, but it is not comparable
@@ -2550,6 +2736,7 @@ order is significant).
   "metamodel": { "version": "1.0", "metamodelId": null },
   "status": "ok",
   "staticErrors": [],
+  "warnings": [],
   "operations": [
     {
       "index": 1,
@@ -2592,7 +2779,7 @@ order is significant).
   "danglingReferences": [],
   "summary": {
     "componentsCreated": 1, "componentsDeleted": 0, "componentsMoved": 0,
-    "propertiesSet": 1, "propertiesRemoved": 1
+    "propertiesSet": 1, "propertiesRemoved": 1, "languagesCreated": 0
   }
 }
 ```
@@ -2601,11 +2788,35 @@ Normative points about the plan document:
 
 - `status` is `"ok"` when the script would apply cleanly, `"error"` otherwise. A plan with `status: "error"` still lists every operation it could resolve, so that a reader sees the whole intent, and the first failing operation carries a non-null `error`.
 - `staticErrors` lists every static error of the script (section "12.3"), each with its code and position. It is non-empty only when `status` is `"error"`, and when it is non-empty no operation is resolved.
+- `warnings` lists the warnings of section "12.4", each as `{ "code": "...", "position": {...}, "operationIndex": n }`, with `position` and `operationIndex` null for a document-level warning such as `NO_COMMAND_RECOGNIZED`. A warning never changes `status`, which stays `"ok"` if the script would apply cleanly. `warnings` is compared like `staticErrors`, by code and by order.
+- `script.syntax` is the surface syntax the script was parsed with, whether it was declared by the pragma attribute `syntax=` or determined by the implementation (section "1.1"); it is always present and always compared.
+- **Operation numbering.** `index` is 1-based and counts operations across the whole script, flat, in source order, whatever the block nesting. The rule for what counts as an operation is: **anything that resolves a component or changes the dictionary.** So:
+  - every command is an operation;
+  - a **block header is an operation**, whether it is a selector chain, a `create`, an `upsert` or an `ensure`; it takes the index preceding its body's operations;
+  - `language-create` is an operation, since it changes the dictionary and carries a `languageCreated` effect;
+  - a `with` header and a `language-default` directive are **not** operations and take no index: they bind names for the rest of a scope and change nothing.
+
+  The same numbering is what `commandIndex` refers to in the conformance corpus (Appendix D.1), so that a case can point at a command inside a block.
 - `error`, where present, is an object `{ "code": "...", "message": "...", "position": {...} }`. `code` is one of Appendix B and is the only part an automated comparison relies on; `message` is free prose and MUST NOT be compared.
-- `effects` uses exactly these `kind` values: `componentCreated`, `componentDeleted`, `componentMoved`, `propertySet`, `propertyReplaced`, `propertyRemoved`. `propertySet` is used when the value did not exist, `propertyReplaced` when it did.
+- `effects` uses exactly these seven `kind` values, each with exactly these fields. Because the plan document is the comparable artifact, the shape of an effect is normative, not illustrative:
+
+| `kind` | Fields | Meaning |
+|---|---|---|
+| `componentCreated` | `componentType`, `position` | a component appears under the operation's `parent` |
+| `componentDeleted` | `componentType`, `position` | a component disappears |
+| `componentMoved` | `componentType`, `fromParent`, `fromPosition`, `toParent`, `toPosition` | a component changes position, parent, or both. `fromParent` and `toParent` are objects `{ "componentType": …, "id": …, "path": … }`, as the operation's `parent` field is; they are equal for a same-parent move. `fromPosition` is the position before the command runs, `toPosition` the position after it has run |
+| `propertySet` | `property`, `language`, `oldValue` (always `null`), `newValue` | a value is written where there was none |
+| `propertyReplaced` | `property`, `language`, `oldValue`, `newValue` | a value is written over an existing one |
+| `propertyRemoved` | `property`, `language`, `oldValue`, `newValue` (always `null`) | a value is removed |
+| `languageCreated` | `languageKind`, `language` | `language-create` adds a language to one of the dictionary's language lists (section "2.1.3") |
+
+- Writing a value **equal** to the one already there is still a change of state performed by the command, and yields a `propertyReplaced` effect whose `oldValue` and `newValue` are equal. Plan mode does not compare values in order to suppress an effect: a command that ran is reported.
+
+- **A `delete` reports exactly one `componentDeleted`**, for the component the command names, and **none for its descendants**, even though deleting a component deletes its descendants (section "8.4"). It reports no `propertyRemoved` for the properties of the deleted components either. The effect list describes what the *script* did, not the transitive closure of what disappeared: a plan that listed one line per descendant would bury a one-line command under fifty effects, and the descendants are recoverable from the dictionary, which the reader has. The same holds for a `move`: one `componentMoved`, never one per descendant.
+- A `create` reports one `componentCreated` followed by one `propertySet` per qualified value written by its initializers, in the order in which the initializers are written.
 - `language` is `null` for a scalar property, and is the language code for a qualified value. A `clear p@*` yields one `propertyRemoved` effect per language actually removed, in the dictionary's language-list order.
-- `position` is 1-based and counts same-type siblings. On `componentCreated` it is the position the component would occupy once created; on `componentDeleted` and on the source side of `componentMoved`, it is the position the component occupies **before** the command runs, so that a `delete all` reports the positions of the original list rather than of the list as it shrinks. It is `null` for an `entry`, whose list the language does not order (section "2").
-- `path` is a human-readable path from the root using the reference syntax; it is informative, and two implementations may differ in it. `id`, `componentType`, `effects`, `error.code` and `summary` are the comparable parts.
+- `position`, `fromPosition` and `toPosition` are 1-based and count same-type siblings. On `componentCreated`, `position` is the position the component would occupy once created; on `componentDeleted`, it is the position the component occupies **before** the command runs, so that a `delete all` reports the positions of the original list rather than of the list as it shrinks. On `componentMoved`, `fromPosition` is read before the command runs and `toPosition` after. All three are `null` for an `entry`, whose list the language does not order (section "2").
+- `path` is a human-readable path from the root using the reference syntax; it is **informative**, and two implementations may differ in it. So are the `fromParent` and `toParent` objects of a `componentMoved` effect, which contain one. Which fields of an `effect` are compared is stated once, in Appendix D.1; `id`, `componentType`, `error.code` and `summary` are compared as well.
 - A command marked `each` or `all` carries `applications` instead of `effects`, one element per affected component, in the execution order of section "5.6".
 - Plan mode never writes to the dictionary, and it MUST be available for both surface syntaxes.
 
@@ -2684,7 +2895,9 @@ whitespace, it matches one of the following:
 1. `COMMAND-LETTER`, optionally followed by the multiplicity marker `*`, followed by one or more whitespace characters, followed by a second token that begins with:
    - `/` — a path (`c /mami`, `d /e[f="mami"]/s[g="pig"]`), or
    - `$` — a label (`s $pig (c = "Noun")`), or
-   - a component letter (or component name) immediately followed by `(` — a constructor with no parent path, which only `c` and `p` accept (`c e("mami")`, `p entry(f="mami", has-gloss="pig")`).
+   - a component letter (or component name) immediately followed by `(` — a constructor with no parent path, which only `c` and `p` accept (`c e("mami")`, `p entry(f="mami", has-gloss="pig")`), or
+   - `(` — the parenthesis of a property command with no path, which is admitted **only on an indented line**, where the parent is supplied by the enclosing indented block (`s (c = "Noun")`, section "3.3"), or
+   - a component letter (or component name) immediately followed by `[` or `#` — a *relative path*, also admitted **only on an indented line**, whose first step is a child of the enclosing indented block's component (`d x#1`, section "3.3").
 2. `language-default ` or `language-create ` followed by `object` or `meta`:
 
 ```
@@ -2694,11 +2907,19 @@ language-create object = "tpi"
 language-create meta = "fr"
 ```
 
-3. the version pragma `%liftpatch 1.0`, on the first non-blank line of the document.
+3. the version pragma `%liftpatch 1.0`, anywhere before the first command line of the document; a pragma declaring a `sigil` must be the first non-blank line (section "1.1").
 
-Every command has a second token of one of the three shapes of rule 1: `c` and
-`p` take either a path or a constructor, and `d`, `e`, `m`, `s`, `u` and `l`
-always take a path, which begins with `/` or with a label.
+Every command has a second token of one of the five shapes of rule 1: `c` and
+`p` take either a path or a constructor; `d`, `e`, `m`, `s`, `u` and `l` take a
+path, which begins with `/` or with a label; and on an indented line a property
+command may take its parenthesis directly, and `c` or `p` its constructor,
+because the enclosing indented block supplies the parent (section "3.3").
+
+**Leading whitespace is significant.** It does not change whether a line is a
+command — the rule above skips it — but it decides which component the command
+applies to, under the indentation rule of section "3.3". A command line at
+column 1 is a top-level command, so a document that never indents a command is
+a flat sequence of independent commands.
 
 The command letters are:
 
@@ -2713,7 +2934,11 @@ Two further rules make the recognition safe in both directions:
 
 **Strict mode: an explicit line sigil.** In a document where a false positive
 would be costly — a document quoting LiftPatchShort commands as examples, for
-instance — the version pragma may declare a *sigil*:
+instance — the version pragma may declare a *sigil*. A sigil is RECOMMENDED in
+**any** document that mixes commands with substantial prose: it reduces
+recognition to a single character, it makes every namespace and look-ahead rule
+of section "2" irrelevant to the question "is this line a command", and it lets a
+lexicographer write about pigs in a file that also creates them:
 
 ```LiftPatchShort
 %liftpatch 1.0 sigil=">"
@@ -2722,10 +2947,12 @@ instance — the version pragma may declare a *sigil*:
 - The sigil is one character, declared on the pragma line, which must then be the first non-blank line of the document.
 - When a sigil is declared, a line is a command **if and only if** it begins, after optional leading whitespace, with that sigil; the rest of the line is then read exactly as above, and a line matching the rules 1–3 above without the sigil is prose. The sigil is not part of the command.
 - When no sigil is declared, the rules 1–3 above apply; this is the default and the common case.
+- In sigil mode, the indentation of a command (section "3.3") is measured from the **sigil**, not from the start of the line: whitespace between the sigil and the command letter is the indentation, and whitespace before the sigil is ignored. This keeps the sigils aligned in a left-hand column, where they are readable.
 
 ```LiftPatchShort
-> c /mami/pig
-> s /mami/pig (c = "Noun")
+> c /mami
+>   c s("pig")
+>     s (c = "Noun")
 ```
 
 **Comments.** A `#` preceded by whitespace, or beginning a line, starts a
@@ -2744,7 +2971,9 @@ line.
 
 A command continues until the end of its physical line: the concise syntax has
 no multiline command, and a long or complex operation must be written in
-LiftPatchRef.
+LiftPatchRef. An indented block (section "3.3") does not break this rule: it is a
+*sequence* of one-line commands sharing a parent, not one command spread over
+several lines.
 
 ### 1.2 Constructs with no concise form
 
@@ -2754,9 +2983,14 @@ LiftPatchRef:
 
 - the strict-parent axis on a link that is not immediately above the command target (section "4");
 - `hn` selection;
-- explicit blocks and nested transactions (embedded initializers cover the common case, section "7");
 - `with` language scoping;
-- an `at` clause on an embedded initializer (section "7").
+- an `at` clause on an embedded initializer (section "7");
+- a block header that is a bare selector chain with no verb: a LiftPatchRef block may be headed by `sense[gloss="pig"] of entry[form@tww="mami"] { … }`, which asserts nothing and creates nothing, whereas the head of an indented block is always a command. Write `e` (ensure) as the head to get the same effect: `e /e[f="mami"]/s[g="pig"]`. The restriction is on what a concise document may *write*: such a header may still appear in the LiftPatchRef expansion of a concise command, as it does for the embedded initializers of section "7".
+
+Blocks themselves **do** have a concise form: an indented block (section "3.3")
+is the concise spelling of a LiftPatchRef block, with the same parent anchoring,
+the same scope for labels and language defaults, and the same transaction
+boundary.
 
 ## 2. Short codes
 
@@ -2766,7 +3000,7 @@ Some commands, components, and properties are abbreviated by the same letter (fo
 
 1. The first token of a command line is a **command** letter, optionally followed by `*`.
 2. A letter immediately followed by `[`, `#`, or `(` and appearing either inside a path (after `/` or `//`) or as the head of an initializer is a **component** letter.
-3. A letter appearing inside square brackets or inside an initializer list, and followed by (optional whitespace) `=`, by `@`, or by a closing parenthesis, is a **property** letter.
+3. A letter appearing inside square brackets or inside a parenthesized list, and followed by (optional whitespace) `=`, `@`, `,` or `)`, is a **property** letter. All four terminators matter, the comma included: in the `clear` list `l /mami/pig (c, d@*)`, the property `c` (`category`) is followed by a comma and by nothing else.
 4. A letter followed by `(` inside an initializer list is a **component** letter opening an embedded initializer (section "7"); the same letter followed by `=`, possibly after whitespace, is a property letter. One token of look-ahead therefore suffices.
 
 **Full names as aliases.** Anywhere a one-letter component code or property code
@@ -2815,7 +3049,7 @@ d* /e[f="mami"]/s[g="pig"]/x[t~"^draft"]
 s* /e[f="mami"]/s[g="pig"] (c = "Noun")
 ```
 
-- `*` is allowed only on `d`, `s`, `u` and `l`, that is on `delete`, `set`, `update` and `clear`. On `c`, `p`, `m` and `e` it raises `MULTIPLICITY_NOT_ALLOWED`.
+- `*` is allowed only on `d`, `s`, `u` and `l`, that is on `delete`, `set`, `update` and `clear`. On `c`, `p`, `m` and `e` it raises `MULTIPLICITY_NOT_ALLOWED`. The grammar of Appendix C.2 admits `*` after every command letter precisely so that this check can report that code: a marker on the wrong verb is a mistake about the language, and telling the writer "multiplicity is not allowed here" is more useful than telling them the line does not parse.
 - It marks the target step of the command — the last step of the path for `d`, the last step of the path for the property commands — exactly as `all` / `each` do in the reference syntax, with the same rules and the same errors.
 
 ### 2.2 Component codes
@@ -2867,9 +3101,11 @@ The properties on components are the same as in LIFT-DSL language, they are refe
 
 Here is the general command syntax for each command.
 
-1/ For components:
+### 3.1 Component commands
 
-*create*: the created component is created under the last selected path component.
+#### *create*
+
+The created component is created under the last selected path component.
 
 ```text
 c <parent_path> <component_type>(<initializer>) [at <position>] [as $<label>]
@@ -2889,34 +3125,58 @@ c <path>
 ```
 
 This third form is available only when the last step of the path is an
-abbreviated step (section "6.1"), that is an entry designated by its bare form
-or a sense designated by its bare gloss. It is defined as a shorthand:
+**abbreviated step** (section "6.1"), that is an entry designated by its bare
+form, a sense designated by its bare gloss, or an example designated by its bare
+text. It is defined as a shorthand:
 
 | Written | Means |
 |---|---|
 | `c /<form>` | `c e(f = "<form>")` |
 | `c /<form>/<gloss>` | `c /e[f = "<form>"] s(g = "<gloss>")` |
+| `c /<form>/<gloss>/<text>` | `c /e[f = "<form>"]/s[g = "<gloss>"] x(t = "<text>")` |
 
 ```LiftPatchShort
-c /mami          # create entry(form = "mami")
-c /mami/pig      # create sense(gloss = "pig") under entry[form = "mami"]
+c /mami                      # create entry(form = "mami")
+c /mami/pig                  # create sense(gloss = "pig") under entry[form = "mami"]
+c /mami/pig/"a mami jefi"    # create example(text = "a mami jefi") under that sense
 ```
 
-In the second line, the leading steps of the path keep their ordinary meaning:
-they *select* and never create. `c /mami/pig` therefore requires the entry
-"mami" to exist and to be unambiguous — the link immediately above the created
-component is the strict axis (section "4") — and it fails with `NOT_FOUND` or
-`AMBIGUOUS_REFERENCE` otherwise. Only the last step is created. To create both
-at once, use `p /mami/pig` (section "8") or an embedded initializer (section
-"7").
+In the second and third of those lines, the leading steps of the path keep their
+ordinary meaning: they *select* and never create. `c /mami/pig` therefore
+requires the entry "mami" to exist and to be unambiguous — the link immediately
+above the created component is the strict axis (section "4") — and it fails with
+`NOT_FOUND` or `AMBIGUOUS_REFERENCE` otherwise. Only the last step is created.
+To create the whole chain at once, use `p /mami/pig` (section "8") or an embedded
+initializer (section "7").
 
-*upsert*: the upserted component is matched or created under the last selected path component:
+If the last step of the path is **not** an abbreviated step, there is nothing for
+the command to build the new component from, and the command is rejected with
+`CONSTRUCTOR_REQUIRED`, a static error: `c /e[f = "mami"]/s[g = "pig"]` names an
+existing sense by a selector and asks for it to be created, which is not a
+meaning the language can give it. Write the constructor:
+`c /e[f = "mami"] s(g = "pig")`.
+
+A fourth form has no path at all. It is available only on an **indented** line,
+where the enclosing indented block supplies the parent (section "3.3"):
+
+```LiftPatchShort
+c /mami
+  c s("pig")
+```
+
+#### *upsert*
+
+The upserted component is matched or created under the last selected path component:
 
 ```
 p <parent_path> <component_type>(<initializers>) [at <position>] [as $<label>]
 p e(<initializers>) [as $<label>]   # for entry
-p <path>                                            # see section "8"
+p <path>                            # abbreviated steps only, see section "8"
+p <component_type>(<initializers>)  # indented lines only, see section "3.3"
 ```
+
+As with `c`, the path-only form requires every step it creates to be an
+abbreviated step, and raises `CONSTRUCTOR_REQUIRED` otherwise (section "8").
 
 **Upserting an entry needs a disambiguation predicate.** `upsert` on an entry is
 rejected with `UPSERT_ENTRY_WITHOUT_DISAMBIGUATION` when the initializer list
@@ -2932,7 +3192,9 @@ p e(f="mami", has-gloss="pig")   # select that entry, or create a new "mami"
 p /mami/pig                      # the idiomatic form (section "8")
 ```
 
-*delete*: the component represented by the last step of the path is deleted:
+#### *delete*
+
+The component represented by the last step of the path is deleted:
 
 ```
 d <path>
@@ -2944,7 +3206,9 @@ Following this rule, for entry a command as the following form:
 d /e[selector] # for entry
 ```
 
-*move*: the last step of the path is moved to a different position or, if a destination path is expressed, under another parent (the last step of the destination path) at the specified position:
+#### *move*
+
+The last step of the path is moved to a different position or, if a destination path is expressed, under another parent (the last step of the destination path) at the specified position:
 
 ```
 m <source-path> [<destination-path>] at <position>
@@ -2953,43 +3217,54 @@ m <source-path> [<destination-path>] at <position>
 The `at <position>` clause is mandatory, as in the reference syntax. `m` cannot
 target an entry: `m /mami` is a syntax error.
 
-*ensure*: the component denoted by the last step of the path is asserted to
-exist. `ensure` selects and never creates, so it takes a path and no
-constructor:
+#### *ensure*
+
+The component denoted by the last step of the path is asserted to exist.
+`ensure` selects and never creates, so it takes a path and no constructor. Like
+`c` and `p`, it may bind a label (Part 1, section "6.3"), which makes it the
+concise way to name a component the document did not create:
 
 ```
-e <path>
+e <path> [as $<label>]
 ```
 
 ```LiftPatchShort
 e /e[f="mami"]/s[g="pig"]
 e /mami/pig
+e /mami/pig as $pig
+s $pig (c = "Noun")
 ```
 
-Earlier drafts wrote this command `e <parent_path> <component_type>[selector]`,
-with the asserted component outside the path; the two forms denote the same
-thing, and the path form is the normative one. `ensure` may target any component
-type, `entry` included.
+`ensure` may target any component type, `entry` included.
 
-2/ For properties: the properties are between parentheses, with only their name (for clear) or their name and their value separated by "=" (for set and update). One command may carry several of them, separated by commas.
+### 3.2 Property commands
 
-*set*:
+The properties are between parentheses, with only their name (for clear) or their name and their value separated by "=" (for set and update). One command may carry several of them, separated by commas.
+
+#### *set*
 
 ```text
 s <path> (<property> = <value> {, <property> = <value>})
 ```
 
-*update*
+#### *update*
 
 ```text
 u <path> (<property> = <value> {, <property> = <value>})
 ```
 
-*clear*:
+#### *clear*
 
 ```text
 l <path> (<property> {, <property>})
 ```
+
+On an **indented** line the path of a property command may be omitted, and the
+command then applies to the component of the enclosing indented block (section
+"3.1"): `s (c = "Noun")`. Outside an indented block the path is mandatory, and a
+property command written without one — like a component command other than an
+`entry` written without a parent — is rejected with `MISSING_PARENT_CLAUSE`, a
+static error.
 
 A list of properties in one command is the concise spelling of the assignment
 list of Part 2, section "9.1.1", and has exactly its semantics: the path is
@@ -3008,11 +3283,17 @@ Three rules of the reference syntax apply unchanged to the parenthesized part:
 - A property of datatype `reference` takes a **path** as its value, never a bare string:
 
 ```LiftPatchShort
-s /mami/pig/r[y="synonym"] (a = /memi)
-s /e[f="mami"]/r[y="synonym"] (a = /e[id="entry-42"])
+s /mami/pig/r#1 (a = /memi)
+s /e[f="mami"]/r[y="synonym", a = /e[id="entry-42"]] (a = /memi)
 ```
 
   The path is resolved like any other path and must yield exactly one component. A label may be used instead: `(a = $newEntry)`. A bare string such as `(a = "entry-42")` is rejected with `REFERENCE_VALUE_MUST_BE_A_CHAIN`.
+
+  Both lines above select the relation before rewriting its target, and neither
+  writes `r[y="synonym"]` alone: the natural identity of a `relation`, a `variant`
+  and a `reversal` is `type + target`, so a unique selector on one of them must
+  give both properties — or reach it by its ordinal, as the first line does (Part
+  2, section "10"). `r[y="synonym"]` on its own is `INCOMPLETE_SELECTOR`.
 
   The same holds **inside a selector**, where a `reference` property is compared
   to a path and not to a quoted id (Part 2, section "10"):
@@ -3033,6 +3314,112 @@ c /memi r(y="synonym", a = $new)
 Section "5" takes each of the eight commands in turn, with an example and its
 translation into the reference syntax.
 
+### 3.3 Indented blocks
+
+A lexicographer entering a new word writes about one entry at a time, and then
+about one sense at a time. Written with a path on every line, that session
+repeats the path on every line:
+
+```LiftPatchShort
+c /mami
+c /mami/pig
+s /mami/pig (c = "Noun")
+c /mami/pig x("a mami jefi")
+c /mami/pig/"a mami jefi" o("free", "I shot a pig")
+```
+
+**Indentation** removes the repetition. It is the concise spelling of the block
+of Part 2, section "11", and it has exactly that semantics — a parent for the
+commands it contains, a scope for labels and language defaults, and a
+transaction boundary:
+
+```LiftPatchShort
+c /mami
+  c s("pig")
+    s (c = "Noun")
+    c x("a mami jefi")
+      c o("free", "I shot a pig")
+  c n("general", "recorded at Yakoro, 2025")
+```
+
+#### The rule
+
+1. **Grouping.** A *command group* is a maximal run of consecutive lines each of which is a command line, a directive line, or a comment line. A blank line or a prose line ends the group. Indentation relates commands **inside one group only**: a command cannot be the parent of a command in another group, however the two are indented. This is what makes the construct safe in a document where commands and prose alternate — an indented line far below a paragraph of prose is a top-level command, not a continuation of something the reader can no longer see.
+2. **Indentation.** The indentation of a command is the number of space characters before it — before the command letter, or, in sigil mode, between the sigil and the command letter (section "1.1"). A **tab** in the indentation of a command line is a `SYNTAX_ERROR`: the width of a tab is a property of the reader's editor, and the parent of an edit may not depend on it.
+3. **Anchoring.** A command indented more than the command line that precedes it in its group opens a block: that preceding command is its *anchor*, and the component the anchor creates, upserts, asserts or targets is the parent of the indented command, exactly as a block header's component is the parent of the block body (Part 2, section "11"). Further lines at the same indentation belong to the same block. A line indented less returns to an already open level, and MUST match one exactly; an indentation that matches no open level is a `SYNTAX_ERROR`.
+4. **How much** a line is indented does not matter, only that it is more, equal, or less. One level is one block.
+
+An anchor must designate exactly one component that still exists after it has
+run, so:
+
+- `c`, `p` and `e` are the natural anchors, and are the common case;
+- a property command (`s`, `u`, `l`) may be an anchor as well: it designates the component it writes on, which is still there afterwards;
+- `d` may **not** be an anchor. Its component is gone by the time the indented commands would run, so a line indented under a `d` is rejected with `DELETE_CANNOT_BE_AN_ANCHOR`, a static error;
+- `m` may neither be indented under anything nor be an anchor (`MOVE_NOT_ALLOWED_IN_BLOCK`, Part 2, section "11");
+- a command carrying the multiplicity marker `*` designates several components and cannot be an anchor: `MULTIPLICITY_NOT_ALLOWED`.
+
+#### What an indented command may omit
+
+Inside a block, the parent is given, so the command need not name it. Three
+forms become available, and they are the forms the recognition rule of section
+"1.1" admits only on an indented line:
+
+| Form | Written | Means |
+|---|---|---|
+| no path | `c s("pig")` | create under the block's component |
+| no path | `s (c = "Noun")` | set on the block's component |
+| relative path | `d x#1` | a path whose first step is a **child** of the block's component |
+
+A path that begins with `/` keeps its ordinary meaning inside a block: it is
+resolved from the root, exactly as at top level. The two are therefore never
+confusable — a leading slash always means "from the root", and its absence
+always means "from here".
+
+#### What an indented block inherits
+
+An indented block **is** a block, so every rule of Part 2, section "11" applies
+without restatement:
+
+- its commands are executed in source order, each seeing the state left by the preceding ones;
+- it is a transaction: if any command in it fails, the block is rolled back, and — since the block then fails — so is the whole document (Part 2, section "12.2");
+- `as $<label>` bindings and `language-default` directives inside it are scoped to it; a label bound by the **anchor** is visible after the block, in the enclosing scope;
+- `m` may not appear in it (`MOVE_NOT_ALLOWED_IN_BLOCK`);
+- `p`, `e` and `u` may not appear in the scope of a `c`, directly or indirectly (`CANNOT_UPSERT_ENSURE_OR_UPDATE_IN_CREATION_BLOCK`): a component the same document has just created cannot already have children to upsert or assert;
+- `c e(...)` may not appear in it: an entry has no parent (`ILLEGAL_PARENT`).
+
+#### The example, expanded
+
+The block above is exactly:
+
+```LiftPatchRef
+create entry(form@tww = "mami") {
+  create sense(gloss@en = "pig") {
+    set category = "Noun"
+    create example(text@tww = "a mami jefi") {
+      create translation(type = "free", text@en = "I shot a pig")
+    }
+  }
+  create note(type = "general", text@en = "recorded at Yakoro, 2025")
+}
+```
+
+Compared with the embedded initializers of section "7", which express the same
+tree on one line, an indented block is not restricted to creation: its commands
+may be `s`, `u`, `l`, `d` or `e` as well as `c`, and its anchor may be a `p` or
+an `e`, which is what lets a session update an entry that already exists:
+
+```LiftPatchShort
+e /mami/pig as $pig
+  s (d@en = "A four-legged terrestrial animal")
+  l (d@fr)
+  d* x[t ~ "^draft"]
+```
+
+The last line carries the multiplicity marker because its predicate is a
+filtering one: `t ~ "^draft"` may match several examples, and a target step that
+may match several must say so (Part 1, section "5.6"). Matching none is not an
+error, so the line is safe on a sense that has no draft example.
+
 ## 4. Paths
 
 A path starts with a slash and is a sequence of slash-separated steps.
@@ -3040,6 +3427,13 @@ A path starts with a slash and is a sequence of slash-separated steps.
 Each step is made of a letter indicating the component type (or the full
 component name, section "2") followed by one or several predicates between square
 brackets, or by an ordinal.
+
+Three properties of a path govern everything in this section, and the first is
+the one most easily got wrong when passing between the two syntaxes:
+
+- **A path reads from the ancestor down to the descendant**, left to right: `/e[f="mami"]/s[g="pig"]` is the entry first and its sense second. A LiftPatchRef chain reads the other way, from the component up to its ancestors: `sense[gloss@en="pig"] of entry[form@tww="mami"]` is the same chain written backwards (Part 1, section "5.1.1"). Wherever this section says "the step that follows", it means the step to the **right**, that is the **child**.
+- **A path starts at the root.** Its first step is an `entry` — written `e[…]`, `e#n` is not available since entries have no ordinal, or an abbreviated bare form (section "6.1") — or a label bound earlier in the document, which stands for whatever component it was bound to. A path whose first step is anything else is rejected with `INCOMPLETE_ANCESTOR_CHAIN`, a static error: `s /s[g="pig"] (c = "Noun")` names no entry. A path that **skips a level** of the hierarchy of Part 1, section "3", is a different error: `d /e[f="mami"]/x[t="…"]` states that an `example` is a child of an `entry`, and is rejected with `ILLEGAL_PARENT`.
+- **Inside an indented block, a path may instead be relative** (section "3.3"): written without the leading `/`, its first step is a child of the block's component. The rule above then applies from that component rather than from the root.
 
 ### 4.1 The axis of a link
 
@@ -3051,18 +3445,43 @@ reference syntax (Part 1, section "5.1.1"):
 | `/` | see the positional rule below | `under` / `of` / `on`, or `within` |
 | `//` | existential | `within` |
 
-The positional rule for the default separator `/` is:
+The positional rule for the default separator `/` is stated once, in terms of the
+*direct target* of the command — the component or the property the command acts
+on:
 
-> In a path,:
-> - for a component command, the link **immediately above the direct target of the command** is the strict axis (The direct target of the command is the component created or upserted by the constructor); every other link of the path is the existential axis (`within`).
-> - for a property command the strict link is the `on` link between the property and its parent, so **every** path link is existential.
- 
- So:
+> **Exactly one link is strict: the one immediately above the direct target of
+> the command. Every other link is existential.**
 
-- in `c /e[f="mami"] s(g="pig")`, the target is the created sense; the link between it and the entry is strict;
-- in `c /e[f="mami"]/s[g="pig"] x(t="…")`, the target is the created example; the link example–sense is strict, and the link sense–entry is existential;
-- in `d /e[f="mami"]/s[g="pig"]`, the target is the sense; the link sense–entry is strict;
-- in `d /e[f="mami"]/s[g="pig"]/x[t="…"]`, the target is the example; the link example–sense is strict, and the link sense–entry is existential.
+The direct target is not always inside the path, which is what makes the rule
+look different from one command to another. There are three cases, and they are
+exhaustive:
+
+| Command | Where the direct target is | Which links of the path are strict |
+|---|---|---|
+| `d`, `e`, and the **source** path of `m` | the last step of the path | the **last link** of the path; every link above it is existential |
+| `c` and `p` with a constructor, and the **destination** path of `m` | not in the path: it is the component the constructor creates, or the component being moved | **none** — the strict link joins the target to the last step, and is not a link of the path. Every link of the path is existential, and the last step is the strict parent |
+| `s`, `u`, `l` | not in the path: it is a property | **none** — the strict link is the `on` link between the property and the last step. Every link of the path is existential |
+
+The **path-only forms** of `c` and `p` — `c /mami/pig`, `p /mami/pig/"a mami
+jefi"` — are not in the table because they are not governed by the positional
+rule at all: sections "3" and "8" define them by their *expansion*, into a
+constructor command and into nested upserts respectively, and the positional rule
+applies to the expanded command. That is why `c /mami/pig` requires the entry
+"mami" to be unambiguous: its expansion, `c /e[f="mami"] s(g="pig")`, puts the
+entry immediately above the created sense, on the strict axis.
+
+Two consequences follow, and they are the ones an implementation is written from:
+
+- the **last step** of a path is always a unique selector: it is either the direct target or the strict parent of the direct target. It is a filtering selector only when the command carries the multiplicity marker `*` (section "4.3");
+- for `d`, `e` and the source path of `m`, the **second-to-last step** is a unique selector too, being the strict parent of the target. Every step above is a filtering selector.
+
+So:
+
+- in `c /e[f="mami"] s(g="pig")`, the target is the created sense; the link between it and the entry is strict, and the path — one step — has no link at all;
+- in `c /e[f="mami"]/s[g="pig"] x(t="…")`, the target is the created example; the link example–sense is strict and lies outside the path, and the path's only link, sense–entry, is existential;
+- in `d /e[f="mami"]/s[g="pig"]`, the target is the sense; the link sense–entry is strict, so both steps are unique selectors;
+- in `d /e[f="mami"]/s[g="pig"]/x[t="…"]`, the target is the example; the link example–sense is strict, and the link sense–entry is existential;
+- in `s /e[f="mami"]/s[g="pig"] (c="Noun")`, the target is the `category` property; the strict link joins it to the sense, and the path's only link, sense–entry, is existential.
 
 Writing `//` forces the existential axis on a link that the positional rule
 would make strict. It is the only way, in the concise syntax, to say "delete
@@ -3151,16 +3570,31 @@ letter, since letters are reserved for component and property names:
 | `[has-gloss = "pig"]` | `[has-gloss = "pig"]` | see Part 1, section "5.3.2.2" |
 | `[id = "entry-42"]` | `[id = "entry-42"]` | see Part 1, section "5.3.1" |
 
-A *filtering step* in the concise syntax is:
+Which steps of a path are *unique selectors* and which are *filtering steps*
+follows from the positional rule of section "4.1", and is stated here
+positionally, so that it can be decided by counting steps:
 
-- a step whose link to the step that follows it is existential — written `//`, or made existential by the positional rule of section "4.1", which is the case of every step of the path except the immediate parent of the command target;
-- the target step itself, when the command carries the multiplicity marker `*`;
-- any step inside a `has` predicate.
+- the **last step** of a path is a unique selector — always, since it is either the direct target of the command or the strict parent of the direct target;
+- for `d`, `e` and the source path of `m`, the **second-to-last step** is a unique selector as well, being the strict parent of the target;
+- **every other step** of the path is a filtering step;
+- the last step becomes a **filtering step** when the command carries the multiplicity marker `*`, which is exactly what the marker says;
+- any step inside a `has` predicate is a filtering step, at any depth.
 
-Every other step must select exactly one component, and a predicate restricted
-to filtering steps that appears there — typically on the immediate parent of the
-target — raises `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`, exactly as in the
-reference syntax.
+Writing `//` on a link does not change which steps are unique: it forces the
+existential axis on that link, and the step above a forced link is a filtering
+step like any step above an existential link. In `d /e[f="mami"]//s[g="pig"]`
+the sense is still the target and still a unique selector; what `//` relaxes is
+the entry, which no longer has to be unambiguous.
+
+The rule is stated positionally rather than in terms of the axis of the link
+above each step, because for a property command no link of the path is strict:
+an axis-based reading would make the `on` target a filtering step and would
+admit `s /e[f="mami"]/s[c="Noun"] (…)`, which Part 2, section "7.3.1", rejects.
+
+Every step that is not a filtering step must select exactly one component, and a
+predicate restricted to filtering steps that appears there — typically on the
+immediate parent of the target — raises
+`PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`, exactly as in the reference syntax.
 
 ```LiftPatchShort
 d* /e[f ~ "^mam"]/s[g="pig"]/x[t ~i "^draft"]
@@ -3196,7 +3630,7 @@ As in the reference language:
 - ensure (e) takes no initializer at all: it is an assertion and its component is designated by the last step of a path (section "3")
 - upsert (p) requires all identity properties
 - the `at <position>` clause behaves as in Part 1, section "6.2": optional on `c` and `p`, defaulting to `at end`, forbidden on `e` and on any command creating an `entry` (`c e("mami") at beginning` is a syntax error).
-- an `as $<label>` binding may close a `c` or `p` command line (section "3")
+- an `as $<label>` binding may close a `c`, `p` or `e` command line (section "3"), and binds the created, resolved or asserted component (Part 1, section "6.3")
 - a multitext initializer may take a multi-language literal, written as in the reference syntax
 - The initializer initializes the property or properties that are required for the creation of a component in the reference syntax. If two properties are required, they are separated by a comma:
 
@@ -3449,8 +3883,8 @@ c /mami s(g="pig")
 This is equivalent with:
 
 ```LiftPatchRef
-create sense[gloss="pig"]
-under  entry[form="mami"]
+create sense(gloss="pig")
+  under entry[form="mami"]
 ```
 
 2/ if the second step of a path is a single string between quotes, then it is the gloss of a sense:
@@ -3485,17 +3919,48 @@ which is equivalent to the following plain LiftPathShort notation:
 c /e[f="mami"]/s[g="pig"] x(t="A mami jefi")
 ```
 
-Wich in turn is equivalent to the following LiftPathRef notation:
+Which in turn is equivalent to the following LiftPatchRef notation:
 
-```LiftPatchShort
+```LiftPatchRef
 create example(text="A mami jefi")
 under sense[gloss="pig"]
 within entry[form="mami"]
 ```
 
+3/ if the third step of a path is a single string, quoted or a bare word, then it
+is the `text` of an example:
+
+```
+/"mami"/"pig"/"a mami jefi"
+```
+
+is equivalent to
+
+```
+/e[f="mami"]/s[g="pig"]/x[t="a mami jefi"]
+```
+
+An example text rarely is a bare word, since it usually contains spaces, so this
+third abbreviation is usually written with quotes. It exists because the
+entry–sense–example chain is the chain a lexicographer writes most often, and
+because it is what makes `c /mami/pig/"a mami jefi"` (section "3") and
+`p /mami/pig/"a mami jefi"` (section "8") mean what they look like.
+
+**The abbreviation is positional, and the list of positions is exhaustive:**
+
+| Position in the path | Component | Property |
+|---|---|---|
+| 1 | `entry` | `form` |
+| 2 | `sense` | `gloss` |
+| 3 | `example` | `text` |
+
+- The position is counted from the root, and nothing else decides it: what the earlier steps look like is irrelevant, so `/e[f="mami"]/pig` is a legal path whose second step is the abbreviated sense, and `/mami/s[g="pig"]/"a mami jefi"` is legal too.
+- A bare or quoted step at position 4 or deeper raises `ABBREVIATED_STEP_NOT_ALLOWED_HERE`, a static error. There is no abbreviation below the example, because below it the component type is no longer determined by the position: a sense may hold an example, a note, a field, an illustration and more.
+- Abbreviated steps are available only in a path that begins at the root, that is one written with a leading `/` whose first step is position 1. In a **relative** path inside an indented block (section "3.3"), and in a path that begins with a **label**, the position from the root is not written down, so every step must name its component type; a bare or quoted step there raises the same error.
+
 #### 6.1.1 The bare word
 
-The abbreviated steps of the two preceding rules are the only place where a
+The abbreviated steps of the three preceding rules are the only place where a
 value may be written without quotes. What may be written there is a *bare word*,
 defined positively:
 
@@ -3627,11 +4092,19 @@ argument beyond the number given for its type, raises
 | Variant | — | — |
 | Reversal | — | — |
 
-The mapping is always "the required properties of the type, in the order of the
-metamodel (Appendix A)", which is what makes it memorable. The three component
-types with no unnamed form are exactly the three whose required properties
-include a `reference`: `relation`, `variant` and `reversal` take a `type` and a
-`target`, and a target is a path, not a string (section "3"). Writing them out
+The mapping is the required properties of the type, in a fixed order, which is
+what makes it memorable. That order is **normative and is declared explicitly**,
+per component type, in the `unnamedArguments` array of Appendix A; the table
+above renders it. It is not derived from the order in which `properties` happens
+to be written there: the metamodel is a JSON document, the order of the keys of a
+JSON object is not significant, and no two parsers need agree on it. The two
+orders do differ — Appendix A writes `etymology`'s properties as `form, gloss,
+source, type`, while `c /… y("borrowing", "mami")` maps its two arguments to
+`type, form`.
+
+The three component types with no unnamed form are exactly the three whose
+required properties include a `reference`: `relation`, `variant` and `reversal`
+take a `type` and a `target`, and a target is a path, not a string (section "3"). Writing them out
 avoids a line in which a quoted string would mean a component:
 
 ```LiftPatchShort
@@ -3725,9 +4198,11 @@ Embedded creation rules also include:
 c /mami/pig x(t = { tww: "a mami jefi", tpi: "mi shutim pik" }) at beginning
 ```
 
-## 8. The `p /form/gloss` idiom
+## 8. The `p /path` idiom
 
-An last and idiomatic construct is an `upsert` command, *followed by a path that contain only an entry (with a form) and a sense (with a gloss)*, and *without the expected constructor*:
+A last and idiomatic construct is an `upsert` command *followed by a path made
+only of abbreviated steps* (section "6.1") and *without the expected
+constructor*:
 
 ```
 p /"mami"/"pig"
@@ -3747,6 +4222,33 @@ upsert entry(form="mami", has-gloss="pig") {
 }
 ```
 
+**The idiom applies to a path of any length**, not only to the two-step form.
+Each step is upserted under the component the preceding step resolved or created,
+and, since the abbreviated steps of section "6.1" go down to the example, the
+useful depths are two and three:
+
+```LiftPatchShort
+p /mami/pig/"a mami jefi"
+```
+
+is
+
+```LiftPatchRef
+upsert entry(form="mami", has-gloss="pig") {
+  upsert sense(gloss="pig") {
+    upsert example(text="a mami jefi")
+  }
+}
+```
+
+— which is, in one line, the operation a lexicographer performs most often:
+record a form, its meaning, and the sentence it was heard in, attaching each to
+what already exists and creating only what does not. Two rules complete the
+generalization:
+
+- the `has-gloss` disambiguation of the entry comes from the **second** step, whenever there is one, exactly as in the two-step form; steps below the second add no disambiguation, since a sense and an example have a natural identity of their own;
+- **every** step must be an abbreviated step. `p /e[f="mami"]/s[g="pig"]` is rejected with `CONSTRUCTOR_REQUIRED` (section "3"): a selector states a condition, and there is no rule for turning an arbitrary condition into the initializers of a component that has to be created. A path of one step, `p /mami`, remains rejected with `UPSERT_ENTRY_WITHOUT_DISAMBIGUATION` (section "3"), since it asks to upsert an entry with nothing to tell the homophones apart.
+
 In other words:
 
 - check if an entry with form "mami" -- and having a sense with gloss "pig" -- exist;
@@ -3765,11 +4267,24 @@ It is different from the equivalent `create` command:
 c /mami s("pig")
 ```
 
-This last command will regularly create the `sense` on a new, non-homophonous "mami"
-`entry`; it will fail if no such `entry` (or if several homophonous entries)
-exist, and it will fail if the `sense` already exist. On the contrary, the
-`upsert` construct will not fail if the entry+sense exist, and it will create the `sense` on a different (new) `entry` if it does not, not adding the `sense`
-on an existing `entry`.
+The two commands differ on every case, and the difference is the point of the
+idiom:
+
+| State of the dictionary | `c /mami s("pig")` | `p /mami/pig` |
+|---|---|---|
+| no entry "mami" | `NOT_FOUND` — the path *selects* and never creates | creates the entry and the sense |
+| exactly one entry "mami", without the sense | creates the sense on it | creates a **new** entry "mami" carrying the sense |
+| exactly one entry "mami", with the sense | `CANNOT_CREATE_DUPLICATE` | succeeds and changes nothing |
+| several entries "mami", none with the sense | `AMBIGUOUS_REFERENCE` | creates a new entry "mami" carrying the sense |
+| several entries "mami", exactly one with the sense | `AMBIGUOUS_REFERENCE` | succeeds and changes nothing |
+| several entries "mami", several with the sense | `AMBIGUOUS_REFERENCE` | `AMBIGUOUS_REFERENCE` |
+
+The row that matters is the second: `c` adds the sense to the entry that is
+there, `p` treats "a mami that means pig" as the thing being upserted, and gives
+the new meaning a new entry rather than attaching it to a homophone that means
+something else. Which of the two is wanted is a lexicographic decision — is this
+a new sense of an existing word, or a different word? — and the language makes
+the writer state it rather than guessing.
 
 ## 9. A worked example
 
@@ -3846,6 +4361,7 @@ the same shape with additional entries, under three conditions:
       "children": ["sense", "etymology", "variant", "relation", "pronunciation",
                    "reversal", "trait", "annotation", "note", "field"],
       "naturalIdentity": [],
+      "unnamedArguments": ["form"],
       "properties": {
         "form":     { "datatype": "multitext", "qualifier": "object", "required": true },
         "morpheme": { "datatype": "string",    "qualifier": null,     "required": false }
@@ -3855,6 +4371,7 @@ the same shape with additional entries, under three conditions:
       "children": ["sense", "example", "relation", "illustration", "reversal",
                    "trait", "annotation", "note", "field"],
       "naturalIdentity": ["gloss"],
+      "unnamedArguments": ["gloss"],
       "properties": {
         "gloss":      { "datatype": "multitext", "qualifier": "meta", "required": true },
         "definition": { "datatype": "multitext", "qualifier": "meta", "required": false },
@@ -3864,6 +4381,7 @@ the same shape with additional entries, under three conditions:
     "example": {
       "children": ["translation", "trait", "annotation", "field"],
       "naturalIdentity": ["text"],
+      "unnamedArguments": ["text"],
       "properties": {
         "text": { "datatype": "multitext", "qualifier": "object", "required": true }
       }
@@ -3871,6 +4389,7 @@ the same shape with additional entries, under three conditions:
     "etymology": {
       "children": ["trait", "annotation", "field"],
       "naturalIdentity": ["type", "form"],
+      "unnamedArguments": ["type", "form"],
       "properties": {
         "form":   { "datatype": "multitext", "qualifier": "object", "required": true },
         "gloss":  { "datatype": "multitext", "qualifier": "meta",   "required": false },
@@ -3881,6 +4400,7 @@ the same shape with additional entries, under three conditions:
     "variant": {
       "children": ["pronunciation", "relation", "trait", "annotation", "field"],
       "naturalIdentity": ["type", "target"],
+      "unnamedArguments": [],
       "properties": {
         "type":   { "datatype": "string",    "qualifier": null, "required": true },
         "target": { "datatype": "reference", "qualifier": null, "required": true }
@@ -3889,6 +4409,7 @@ the same shape with additional entries, under three conditions:
     "relation": {
       "children": ["trait", "annotation", "field"],
       "naturalIdentity": ["type", "target"],
+      "unnamedArguments": [],
       "properties": {
         "type":   { "datatype": "string",    "qualifier": null, "required": true },
         "target": { "datatype": "reference", "qualifier": null, "required": true }
@@ -3897,6 +4418,7 @@ the same shape with additional entries, under three conditions:
     "reversal": {
       "children": ["trait", "annotation", "field"],
       "naturalIdentity": ["type", "target"],
+      "unnamedArguments": [],
       "properties": {
         "form":   { "datatype": "multitext", "qualifier": "object", "required": false },
         "type":   { "datatype": "string",    "qualifier": null,     "required": true },
@@ -3906,6 +4428,7 @@ the same shape with additional entries, under three conditions:
     "illustration": {
       "children": ["annotation", "field"],
       "naturalIdentity": ["url"],
+      "unnamedArguments": ["url"],
       "properties": {
         "url":   { "datatype": "url",       "qualifier": null,   "required": true },
         "label": { "datatype": "multitext", "qualifier": "meta", "required": false }
@@ -3914,6 +4437,7 @@ the same shape with additional entries, under three conditions:
     "media": {
       "children": ["annotation", "field"],
       "naturalIdentity": ["url"],
+      "unnamedArguments": ["url"],
       "properties": {
         "url":   { "datatype": "url",       "qualifier": null,   "required": true },
         "label": { "datatype": "multitext", "qualifier": "meta", "required": false }
@@ -3922,6 +4446,7 @@ the same shape with additional entries, under three conditions:
     "pronunciation": {
       "children": ["media", "trait", "annotation", "field"],
       "naturalIdentity": ["transcription"],
+      "unnamedArguments": ["transcription"],
       "properties": {
         "transcription": { "datatype": "multitext", "qualifier": "object", "required": true }
       }
@@ -3929,6 +4454,7 @@ the same shape with additional entries, under three conditions:
     "trait": {
       "children": ["annotation", "field"],
       "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "value"],
       "properties": {
         "type":  { "datatype": "string", "qualifier": null, "required": true },
         "value": { "datatype": "string", "qualifier": null, "required": true }
@@ -3937,6 +4463,7 @@ the same shape with additional entries, under three conditions:
     "annotation": {
       "children": [],
       "naturalIdentity": ["type", "value"],
+      "unnamedArguments": ["type", "value"],
       "properties": {
         "type":    { "datatype": "string",    "qualifier": null,   "required": true },
         "value":   { "datatype": "string",    "qualifier": null,   "required": true },
@@ -3948,6 +4475,7 @@ the same shape with additional entries, under three conditions:
     "note": {
       "children": ["annotation"],
       "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "text"],
       "properties": {
         "type": { "datatype": "string",    "qualifier": null,   "required": true },
         "text": { "datatype": "multitext", "qualifier": "meta", "required": true }
@@ -3956,6 +4484,7 @@ the same shape with additional entries, under three conditions:
     "field": {
       "children": ["annotation"],
       "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "text"],
       "properties": {
         "type": { "datatype": "string",    "qualifier": null,   "required": true },
         "text": { "datatype": "multitext", "qualifier": "meta", "required": true }
@@ -3964,6 +4493,7 @@ the same shape with additional entries, under three conditions:
     "translation": {
       "children": [],
       "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "text"],
       "properties": {
         "type": { "datatype": "string",    "qualifier": null,   "required": true },
         "text": { "datatype": "multitext", "qualifier": "meta", "required": true }
@@ -3971,10 +4501,12 @@ the same shape with additional entries, under three conditions:
     }
   },
   "pseudoProperties": {
-    "id":         { "datatype": "string",  "scope": "entry and sense only" },
-    "hn":         { "datatype": "integer", "scope": "entry only" },
-    "has-gloss":  { "datatype": "multitext", "qualifier": "meta", "scope": "entry only" },
-    "ordinal":    { "datatype": "integer", "scope": "every component type except entry" }
+    "id":        { "kind": "identifier",     "datatype": "string",  "scope": "entry and sense only" },
+    "hn":        { "kind": "lookupKey",      "datatype": "integer", "scope": "entry only" },
+    "ordinal":   { "kind": "position",       "datatype": "integer", "scope": "every component type except entry" },
+    "has":       { "kind": "childPredicate", "argument": "step",    "scope": "every component type" },
+    "has-gloss": { "kind": "childPredicate", "argument": "string", "qualifier": "meta",
+                   "scope": "entry only", "expandsTo": "has sense[gloss@L = V]" }
   }
 }
 ```
@@ -3985,7 +4517,9 @@ Reading rules:
 - `qualifier` gives the language kind of a multitext (`"object"` or `"meta"`) and is `null` for every scalar property. A property with a non-null `qualifier` is exactly a property that accepts an `@L` key and the `@*` wildcard.
 - `required` is *required at creation*: for a multitext, at least one qualified value.
 - `naturalIdentity` is the natural identity property set `I(T)` of section "5.2". An empty set — `entry` — means that the uniqueness invariant is vacuous for that type and that `create` never rejects it as a duplicate. When a multitext belongs to the set, values are compared language by language, and unset qualified values never take part in the comparison.
-- `pseudoProperties` do not belong to the data: they are selection devices, and their availability per command is given by the applicability tables of section "5.4".
+- `unnamedArguments` is the ordered list of properties that the unnamed initializer arguments of LiftPatchShort map to, position by position (Part 3, section "6.2.4"). It is declared explicitly, and is **not** derived from the order in which `properties` happens to be written: the order of the keys of a JSON object is not significant, so a derived rule would make the meaning of `c /mami f("editorial", "To be checked")` depend on a parser's hash table. An empty list means the component type admits no unnamed argument, and any unnamed argument given to it raises `UNNAMED_ARGUMENT_NOT_ALLOWED`; so does an argument beyond the length of the list. Every property listed here is a required property of its type.
+- `pseudoProperties` do not belong to the data: they are selection devices, and their availability per command is given by the applicability tables of section "5.4". `kind` says what sort of device each one is — `identifier` (a persistent id), `lookupKey` (a dictionary-assigned disambiguator), `position` (an ordinal), `childPredicate` (a condition on the children of the component) — and is what an implementation dispatches on, rather than on the name. A `childPredicate` is not a datatype-bearing property: `argument` gives what it is written with, a step for `has` and a string for `has-gloss`, and `expandsTo` gives the equivalent general form of the shorthand.
+- An extended metamodel (see "Extensibility" above) may add an `unnamedArguments` list to a component type it introduces, and may not change the one of a component type declared here.
 
 ## Appendix B. Error codes
 
@@ -3995,7 +4529,9 @@ Part 2, section "12.3":
 - **static** — the error depends only on the text of the script and on the metamodel of Appendix A. An implementation MUST report every static error of a script before applying any command, and a script containing one changes nothing;
 - **dynamic** — the error depends on the state of the dictionary, and is raised while the command is being resolved or applied. A dynamic error aborts the script and rolls back every change already applied (section "12.2").
 
-Plan mode (section "12.4") reports both kinds without changing anything.
+Plan mode (section "12.4") reports both kinds without changing anything. It also
+reports **warnings**, which are not errors and do not stop a script; they are
+listed in B.4.
 
 ### B.1 Static errors
 
@@ -4004,9 +4540,9 @@ Plan mode (section "12.4") reports both kinds without changing anything.
 | `UNSUPPORTED_LANGUAGE_VERSION` | the version pragma declares a version the implementation does not support | 1.1 |
 | `UNKNOWN_PRAGMA_ATTRIBUTE` | the version pragma carries an attribute other than `sigil` and `metamodel` | 1.1 |
 | `UNSUPPORTED_METAMODEL` | the pragma requires a metamodel that the implementation has not loaded | 1.1, Appendix A |
-| `PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE` | a property is used on a component type on which Appendix A does not define it | 4.1, 7.0.1 |
-| `ILLEGAL_PARENT` | a component is created or moved under a component type that Appendix A does not list as its parent | 3, 8.5 |
-| `LANG_KEY_NOT_SUPPORTED_ON_SCALAR` | an `@L` or `@*` qualifier, or a multi-language literal, is written on a scalar property | 4.4, 5.6.1 |
+| `PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE` | a property is used on a component type on which Appendix A does not define it | 4.1, 7.1 |
+| `ILLEGAL_PARENT` | two component types are stated to be parent and child where Appendix A does not relate them: a component created or moved under such a parent, a `create entry(...)` in a block body, or two adjacent steps of a chain or a path — which is what "skipping a level" amounts to, as in `on example[...] of entry[...]` or `d /e[f="mami"]/x[t="…"]` | 3, 7.3, 8.5, 11 |
+| `LANG_KEY_NOT_SUPPORTED_ON_SCALAR` | an `@L` or `@*` qualifier, or a multi-language literal, is written on a scalar property | 4.4, 5.5.1 |
 | `MISSING_LANGUAGE_QUALIFIER` | `clear` is written on a multitext with neither a language code nor `@*` | 9.3.1 |
 | `WILDCARD_NOT_ALLOWED` | `@*` is used where it is forbidden: in a `create`, `upsert`, `set` or `update` assignment | 4.4.1, 9.1, 9.2 |
 | `DUPLICATE_PROPERTY` | the same qualified property is initialized or assigned twice in one command — in an initializer list, in an assignment list, or inside one multi-language literal | 6.1, 5.5.1, 9.1.1 |
@@ -4016,31 +4552,39 @@ Plan mode (section "12.4") reports both kinds without changing anything.
 | `INCOMPLETE_SELECTOR` | a selector required to select exactly one component uses no valid selection strategy | 5.1.3 |
 | `MISSING_REQUIRED_PROPERTY` | a `create` or `upsert` initializer list omits a property that Appendix A declares required | 6.1 |
 | `MISSING_IDENTITY_PROPERTY` | an `upsert` initializer list does not cover the whole natural identity property set of the component type | 8.2 |
-| `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR` | `!=`, `~`, `~i`, `exists()` or `absent()` is used in a command selector or in a `/` (`of` / `under` / `on`) parent selector | 5.1.2 |
-| `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | `id`, `hn`, `has-gloss` or an ordinal is used in a filtering selector (`within`, or inside `has`) | 5.1.1, 5.3 |
+| `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR` | a unique selector carries a predicate that is not part of its selection strategy: either a filtering-only operator (`!=`, `~`, `~i`, `exists()`, `absent()`), or an otherwise legal predicate added to a complete strategy, as in `sense[gloss@en = "pig", category = "Noun"]`. The `has` refinement of strategies S3 and S4 and the `hn` refinement of S4 are part of the strategy and are not additions | 5.1.2, 5.1.3, 5.4.1 |
+| `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | `id`, `hn`, `has-gloss` or an ordinal is used in a filtering selector — the parent side of `within` / `//`, a step inside `has`, or a step marked `each` / `all` / `*` | 5.1.4, 5.3 |
 | `COMMAND_NOT_ALLOWING_HN` | `hn` is used with a command that does not allow it, in particular in an `upsert` initializer list | 5.3.2.1 |
-| `COMMAND_NOT_ALLOWING_HAS_GLOSS` | `has-gloss` or `has` is used with a command that does not allow it, `create` in particular | 5.3.2.2 |
+| `COMMAND_NOT_ALLOWING_HAS` | `has` or `has-gloss` is used with a command that does not allow it, `create` in particular | 5.3.2.2 |
 | `HN_CANNOT_BE_USED_ALONE` | `hn` is used in a selector that does not also give `form` | 5.3.2.1 |
 | `HAS_GLOSS_CANNOT_BE_USED_ALONE` | `has-gloss` is used in a selector that does not also give `form` | 5.3.2.2 |
 | `ILLEGAL_HN` | the value given for `hn` is not an integer, or is lower than 1 | 5.3.2.1 |
-| `ILLEGAL_ORDINAL` | an ordinal is lower than 1 | 5.3.3 |
+| `ILLEGAL_ORDINAL` | an ordinal, or the `n` of an `at index n` clause, is lower than 1 | 5.3.3, 6.2 |
 | `ID_NOT_ALLOWED_ON_UPSERT` | `id` is used in an `upsert` initializer list | 8.2 |
 | `UPSERT_ENTRY_WITHOUT_DISAMBIGUATION` | `upsert entry(...)` gives a `form` with no `has` or `has-gloss` predicate | 8.2 |
-| `MULTIPLICITY_NOT_ALLOWED` | `each` / `all` (or `*` in LiftPatchShort) is used on a parent step, or on `create`, `upsert`, `ensure` or `move` | 5.7 |
+| `INCOMPLETE_ANCESTOR_CHAIN` | a chain or a path stops before reaching the root: `on sense[...]` with no further ancestor clause, `/s[g="pig"]`. A chain that skips a level is `ILLEGAL_PARENT` instead | 7.3, Part 3, 4 |
+| `MISSING_PARENT_CLAUSE` | a command gives no parent where one is required: a component command whose target is not an `entry` written with no `under` clause, or a property command written with no `on` clause, outside a block; in LiftPatchShort, the same commands written with no path outside an indented block | 7.2, 11, Part 3, 3, 3.1 |
+| `CONSTRUCTOR_REQUIRED` | a `c` or `p` command is written with a path and no constructor, and a step it would have to create is not an abbreviated step: `c /e[f="mami"]/s[g="pig"]` | Part 3, 3, 8 |
+| `ABBREVIATED_STEP_NOT_ALLOWED_HERE` | a bare word or a quoted string is written as a path step at a position for which no abbreviation is defined: below the third step, in a relative path, or in a path beginning with a label | Part 3, 6.1 |
+| `OPERATOR_NOT_APPLICABLE_TO_DATATYPE` | an operator is used on a datatype that does not admit it, such as `~` or `~i` on a `reference` or an `integer` property | 5.1.2 |
+| `INVALID_TARGET` | the component designated as the value of a `reference` property is neither an `entry` nor a `sense`. Static, because the component type is written in the chain or is known from the label's binding | 10 |
+| `MULTIPLICITY_NOT_ALLOWED` | `each` / `all` (or `*` in LiftPatchShort) is used on a parent step, on `create`, `upsert`, `ensure` or `move`, or on a command used as the anchor of an indented block | 5.6, Part 3, 3.3 |
 | `DUPLICATE_LABEL` | a label name visible in the current scope is bound again | 6.3 |
 | `UNKNOWN_LABEL` | a `$name` is used that no visible command has bound | 6.3 |
 | `REFERENCE_VALUE_MUST_BE_A_CHAIN` | a bare string is assigned to, or compared with, a property of datatype `reference`, in a command or in a selector | 10 |
 | `MOVE_NOT_ALLOWED_IN_BLOCK` | a `move` command appears in a block body | 11 |
+| `DELETE_CANNOT_BE_AN_ANCHOR` | a LiftPatchShort command line is indented under a `d`, whose component no longer exists when the indented commands would run | Part 3, 3.3 |
 | `CANNOT_UPSERT_ENSURE_OR_UPDATE_IN_CREATION_BLOCK` | an `upsert`, `ensure` or `update` appears, directly or indirectly, in the scope of a `create` block | 11 |
 | `CANNOT_CLEAR_IDENTITY_PROPERTY` | `clear` targets a scalar property belonging to the natural identity property set | 9.3.1 |
 | `CANNOT_CLEAR_REQUIRED_PROPERTY` | `clear` targets a scalar property that Appendix A declares required | 9.3.1 |
 | `SYNTAX_ERROR` | the script does not parse, or uses a construct the grammar forbids in that position (see the list below) | Appendix C |
 
 Syntax errors are static too, and are reported with their position. They include
-in particular: `move entry[...]`; a `move` without an `at` clause; an `ensure`
-with an initializer list instead of a selector; an `at` clause on `ensure` or on
-a command creating an `entry`; and, in LiftPatchShort, a command spread over
-several physical lines and a step combining an ordinal with a predicate.
+in particular:
+
+- in both syntaxes: an `ensure` with an initializer list instead of a selector; an `at` clause on `ensure` or on a command creating an `entry`; an `at before` / `at after` step whose component type is not the type being placed (section "6.2.1"); a step combining an ordinal with a predicate; a label on the parent side of a `within` / `//` link; an unterminated string, a raw line break inside a string, or a backslash followed by anything other than `"` or `\` in a double-quoted string (section "1.2");
+- in LiftPatchRef: `move entry[...]`; a `move` without an `at` clause;
+- in LiftPatchShort: a command spread over several physical lines; `m /mami`, which would move an entry; a tab character in the indentation of a command line, and an indentation that matches no open block level (Part 3, section "3.3").
 
 ### B.2 Dynamic errors
 
@@ -4052,32 +4596,46 @@ several physical lines and a step combining an ordinal with a predicate.
 | `UNSET_PROPERTY` | `update` or `clear` targets a property that has no value at all | 9.2, 9.3.1 |
 | `UNSET_QUALIFIED_PROPERTY` | `update` or `clear` targets a qualified value `p@L` that is not set, even though another language of `p` is | 9.2, 9.3.1 |
 | `CANNOT_CLEAR_REQUIRED_MULTITEXT` | `clear` would leave a required or identity multitext with no value at all | 9.3.1 |
-| `HN_NOT_EXISTING` | no entry has the requested homophone number for this form | 5.3.2.1 |
-| `INDEX_OUT_OF_BOUNDS` | an ordinal or an `at index n` falls outside the valid range of the same-type sibling list | 5.3.3, 6.2, 8.5 |
+| `INDEX_OUT_OF_BOUNDS` | an ordinal or an `at index n` is greater than the upper bound of the same-type sibling list. A value lower than 1 is the static `ILLEGAL_ORDINAL` instead | 5.3.3, 6.2, 8.5 |
 | `MOVING_TO_CURRENT_POSITION` | a `move` resolves to the position the component already occupies | 8.5 |
 | `SELF_ANCESTOR` | a `move` would make a component its own ancestor | 8.5 |
-| `NO_SUCH_TARGET` | the id given to a `reference` property resolves to no component | 10 |
-| `INVALID_TARGET` | the target of a `reference` property is neither an entry nor a sense | 10 |
 | `NO_SUCH_OBJECT_LANGUAGE` | an object language code is not in the dictionary's object language list | 2.1, 4.2 |
 | `NO_SUCH_META_LANGUAGE` | a meta language code is not in the dictionary's meta language list | 2.1, 4.2 |
 | `LANGUAGE_ALREADY_EXISTS` | `language-create` names a language the dictionary already has | 2.1.3 |
 
-### B.3 Withdrawn codes
+### B.3 Codes that must not be raised
 
-These codes appeared in earlier drafts and MUST NOT be raised by a conforming
-implementation. Each is replaced by a code of the tables above:
+A conforming implementation MUST NOT raise any of the following codes. They are
+listed because they are named by documents and implementations that predate this
+version, and because each of them denotes a condition that a code of B.1 or B.2
+already denotes:
 
-| Withdrawn code | Replaced by |
+| Code | Raise instead |
 |---|---|
 | `EMPTY_MULTITEXT` | `UNSET_PROPERTY` |
 | `QUALIFIED_PROPERTY_NOT_FOUND` | `UNSET_QUALIFIED_PROPERTY` |
 | `INCOMPATIBLE_DESTINATION` | `ILLEGAL_PARENT` |
 | `DUPLICATE_COMPONENT` | `CANNOT_CREATE_DUPLICATE` |
-| `ENTRY_CANNOT_MOVE` | a syntax error |
+| `ENTRY_CANNOT_MOVE` | `SYNTAX_ERROR` |
 | `NEGATIVE_HN` | `ILLEGAL_HN` |
-| `ILLEGAL_USE_OF_HAS_GLOSS` | `COMMAND_NOT_ALLOWING_HAS_GLOSS` |
+| `ILLEGAL_USE_OF_HAS_GLOSS` | `COMMAND_NOT_ALLOWING_HAS` |
+| `COMMAND_NOT_ALLOWING_HAS_GLOSS` | `COMMAND_NOT_ALLOWING_HAS`, which governs the general `has` predicate as well |
 | `ILLEGAL_LANGUAGE` | `NO_SUCH_OBJECT_LANGUAGE` / `NO_SUCH_META_LANGUAGE` |
-| `OPERATOR_REQUIRE_A_MULTITEXT` | — withdrawn without replacement: `exists()` and `absent()` accept a scalar property as well as a multitext one (section "5.1.2") |
+| `OPERATOR_REQUIRE_A_MULTITEXT` | `OPERATOR_NOT_APPLICABLE_TO_DATATYPE` |
+| `HN_NOT_EXISTING` | `NOT_FOUND` (section "5.3.2.1") |
+| `NO_SUCH_TARGET` | `NOT_FOUND` (section "10") |
+
+### B.4 Warnings
+
+A warning reports a situation that is legal, changes nothing, and is more often a
+mistake than an intention. A warning never stops a script, never changes the
+`status` of a plan document, and never appears in `staticErrors`; plan mode
+carries warnings in its `warnings` array (section "12.4.1").
+
+| Code | Reported when | Defined in |
+|---|---|---|
+| `NO_COMMAND_RECOGNIZED` | not one line of the document was recognized as a command. Usually a LiftPatchRef script read as a LiftPatchShort document, which would otherwise apply nothing, silently | 1.1, 12.4 |
+| `COMMAND_APPLIES_TO_NO_COMPONENT` | a command marked `each`, `all` or `*` whose target step matched no component. Legal by section "5.6", and worth saying out loud | 5.6, 12.4 |
 
 ## Appendix C. Grammars
 
@@ -4101,15 +4659,16 @@ name          ::= letter { letter | digit | '-' | '_' }
 comment       ::= '#' { any-char } end-of-line
 ```
 
-A single quote is escaped as `''` inside a single-quoted string, a double quote
-as `\"` inside a double-quoted string. In LiftPatchRef a comment starts at any
+The escaping rules of section "1.2" apply and are exhaustive: `''` inside a
+single-quoted string; `\"` and `\\`, and nothing else, inside a double-quoted
+string; no raw line break inside either. In LiftPatchRef a comment starts at any
 unquoted `#`; in LiftPatchShort, at a `#` that begins a line or is preceded by
 whitespace (Part 3, section "1.1").
 
 ### C.1 LiftPatchRef
 
 ```ebnf
-script            ::= [ pragma ] { item }
+script            ::= { comment } [ pragma ] { item }
 item              ::= command | block | directive | comment
 pragma            ::= '%liftpatch' version { name '=' string }
 version           ::= integer '.' integer
@@ -4121,7 +4680,8 @@ block             ::= block-header '{' { block-item } '}'
 block-item        ::= block-command | block | directive | comment
 block-command     ::= create-cmd | upsert-cmd | ensure-cmd | delete-cmd
                     | set-cmd | update-cmd | clear-cmd
-block-header      ::= chain | create-cmd | upsert-cmd | ensure-cmd | with-header
+block-header      ::= chain [ label-binding ] | create-cmd | upsert-cmd
+                    | ensure-cmd | with-header
 with-header       ::= 'with' binding { ',' binding }
 binding           ::= lang-kind '=' string
 
@@ -4130,7 +4690,7 @@ command           ::= create-cmd | upsert-cmd | ensure-cmd | delete-cmd | move-c
 
 create-cmd        ::= 'create' constructor [ 'under' chain ] [ at-clause ] [ label-binding ]
 upsert-cmd        ::= 'upsert' constructor [ 'under' chain ] [ at-clause ] [ label-binding ]
-ensure-cmd        ::= 'ensure' step [ 'under' chain ]
+ensure-cmd        ::= 'ensure' step [ 'under' chain ] [ label-binding ]
 delete-cmd        ::= 'delete' [ multiplicity ] step [ 'under' chain ]
 move-cmd          ::= 'move' step 'under' chain [ 'under' chain ] at-clause
 
@@ -4185,31 +4745,36 @@ Notes on the productions that carry a rule of their own:
 - Every `step` carries either a selector between square brackets or an ordinal, or else is a label: a component type written alone selects nothing and is not a step. A component type followed by parentheses is a `constructor`, not a step, and it creates instead of selecting (section "6").
 - The `on` keyword closes a value chain (section "10"), which is why `on` cannot be a component name.
 - `move` takes one `under` chain for the source parent and an optional second one for the destination parent; `at-clause` is mandatory. `move` is absent from `block-command`: it cannot appear in a block body (`MOVE_NOT_ALLOWED_IN_BLOCK`, section "11").
-- The optional `'under'` / `'on'` clauses are omitted only inside a block, whose header supplies the parent (section "11").
+- The optional `'under'` / `'on'` clauses are omitted only inside a block, whose header supplies the parent (section "11"). The grammar makes them optional everywhere because it does not know whether it is inside a block; a command other than one targeting an `entry` that omits its parent clause at top level is rejected with `MISSING_PARENT_CLAUSE`, a static error.
+- The grammar admits a `chain` that stops before reaching an `entry`, and one whose steps skip a level of the hierarchy, because parentage is a metamodel question; both are rejected with `INCOMPLETE_ANCESTOR_CHAIN` (section "7.3").
+- The grammar admits a `label-ref` as any `step` of a `chain`, including after `within`; a label on the parent side of a `within` link is a syntax error (section "6.3").
 - `at-clause` is forbidden when the constructor creates an `entry` (section "6.2"). The grammar cannot express that restriction, since `component-type` is one production; it is a static error.
 - On a property of datatype `reference`, the `value` of an `assignment`, of an `initializer` and of a `predicate` alike must be a `chain` or a `label-ref`, never a `string` (section "10"): `REFERENCE_VALUE_MUST_BE_A_CHAIN`. The grammar admits `string` there because it does not know datatypes.
 
 ### C.2 LiftPatchShort
 
 ```ebnf
-document          ::= [ pragma-line ] { line }
-line              ::= command-line | prose-line
-command-line      ::= [ sigil ] ( command | directive ) [ comment ] end-of-line
+document          ::= { line }
+line              ::= command-line | prose-line | pragma-line
+command-line      ::= [ spaces ] [ sigil ] indent ( command | directive )
+                      [ comment ] end-of-line
 prose-line        ::= [ '\' ] { any-char } end-of-line
-pragma-line       ::= '%liftpatch' version { name '=' string } end-of-line
+pragma-line       ::= [ spaces ] '%liftpatch' version { name '=' string } end-of-line
 sigil             ::= the one character declared by the pragma attribute `sigil`
+spaces            ::= { ' ' }
+indent            ::= { ' ' }
 
 command           ::= create-cmd | upsert-cmd | ensure-cmd | delete-cmd | move-cmd
                     | set-cmd | update-cmd | clear-cmd
 
-create-cmd        ::= 'c' ( [ path ] constructor [ at-clause ] [ label-binding ] | path )
-upsert-cmd        ::= 'p' ( [ path ] constructor [ at-clause ] [ label-binding ] | path )
-ensure-cmd        ::= 'e' path
+create-cmd        ::= 'c' [ '*' ] ( [ path ] constructor [ at-clause ] [ label-binding ] | path )
+upsert-cmd        ::= 'p' [ '*' ] ( [ path ] constructor [ at-clause ] [ label-binding ] | path )
+ensure-cmd        ::= 'e' [ '*' ] path [ label-binding ]
 delete-cmd        ::= 'd' [ '*' ] path
-move-cmd          ::= 'm' path [ path ] at-clause
-set-cmd           ::= 's' [ '*' ] path '(' assignment { ',' assignment } ')'
-update-cmd        ::= 'u' [ '*' ] path '(' assignment { ',' assignment } ')'
-clear-cmd         ::= 'l' [ '*' ] path '(' property-ref { ',' property-ref } ')'
+move-cmd          ::= 'm' [ '*' ] path [ path ] at-clause
+set-cmd           ::= 's' [ '*' ] [ path ] '(' assignment { ',' assignment } ')'
+update-cmd        ::= 'u' [ '*' ] [ path ] '(' assignment { ',' assignment } ')'
+clear-cmd         ::= 'l' [ '*' ] [ path ] '(' property-ref { ',' property-ref } ')'
 
 assignment        ::= property-ref '=' short-value
 constructor       ::= component-code '(' [ short-init { ',' short-init } ] ')'
@@ -4219,7 +4784,10 @@ short-init        ::= property-ref '=' short-value
 short-value       ::= string [ '@' lang ] | integer | multitext-literal
                     | path | label-ref
 
-path              ::= label-ref { axis path-step } | axis path-step { axis path-step }
+path              ::= absolute-path | relative-path
+absolute-path     ::= label-ref { axis path-step }
+                    | axis path-step { axis path-step }
+relative-path     ::= path-step { axis path-step }
 axis              ::= '/' | '//'
 path-step         ::= component-code ( '[' selector ']' | ordinal | '[' integer ']' )
                     | abbreviated-step
@@ -4252,8 +4820,18 @@ reference name alike (Part 3, section "2").
 Two productions are ambiguous on their own and are disambiguated by the rules of
 Part 3, sections "1.1" and "2", which a parser MUST apply:
 
-- `command-line` versus `prose-line`: a line is a command only if it satisfies the recognition rule of section "1.1" — command letter, optional `*`, whitespace, then a token beginning with `/`, with `$`, or with a component code immediately followed by `(` — or, when a sigil is declared, only if it begins with that sigil. A line that matches but does not parse is an error, never prose.
-- `component-code` versus `abbreviated-step` and `property-code` versus a value: one character of look-ahead decides. A letter followed by `[`, `#` or `(` is a component code; a letter followed by `=`, by `@`, or by the closing parenthesis of a `clear` is a property code; anything else in a path step is a bare word, that is an entry form or a sense gloss.
+- `command-line` versus `prose-line`: a line is a command only if it satisfies the recognition rule of section "1.1" — command letter, optional `*`, whitespace, then a token beginning with `/`, with `$`, with a component code immediately followed by `(`, or — on an indented line only — with `(` or with a component code immediately followed by `[` or `#`. When a sigil is declared, a line is a command **if and only if** it begins, after optional whitespace, with that sigil; the `[ sigil ]` of the `command-line` production is optional only because one production covers both modes. A line that matches the rule but does not parse is an error, never prose.
+- `component-code` versus `abbreviated-step` and `property-code` versus a value: one character of look-ahead decides. A letter followed by `[`, `#` or `(` is a component code; a letter followed by `=`, `@`, `,` or `)` is a property code; anything else in a path step is a bare word, that is an abbreviated step (Part 3, section "6.1").
+
+Seven further constraints are not expressed by the grammar and are static errors:
+
+- `indent` is the whitespace between the sigil — or the start of the line, when no sigil is declared — and the command letter. It is significant (Part 3, section "3.3"), and it MUST be made of spaces: a tab there is a `SYNTAX_ERROR`, as is an indentation matching no open block level.
+- `[ path ]` is omitted, and `relative-path` is used, only on an **indented** line, whose enclosing block supplies the parent. At top level both raise `MISSING_PARENT_CLAUSE`.
+- `[ '*' ]` is admitted on all eight commands so that a marker on `c`, `p`, `e` or `m` can be reported as `MULTIPLICITY_NOT_ALLOWED` rather than as a parse failure, and so that `*` on the anchor of an indented block can be reported the same way.
+- the path-only alternative of `create-cmd` and `upsert-cmd` requires every step it creates to be an `abbreviated-step`; otherwise `CONSTRUCTOR_REQUIRED`.
+- an `abbreviated-step` is admitted by the grammar at any position, and is legal only at positions 1, 2 and 3 of an `absolute-path` that does not begin with a label; elsewhere `ABBREVIATED_STEP_NOT_ALLOWED_HERE`.
+- at most one `pragma-line` may appear in a document, and it must precede the first `command-line`; a pragma declaring a `sigil` must be the first non-blank line (section "1.1");
+- a `label-ref` may not stand on the parent side of a `//` link.
 
 ## Appendix D. The conformance corpus
 
@@ -4264,8 +4842,10 @@ conformance to LiftPatch 1.0 by passing every case of the corpus.
 
 The corpus has a second purpose, internal to this document: every example
 written in Parts 1 to 3 is meant to be a legal script with a stated outcome, and
-three illegal ones survived several reviews before being caught by hand. A
-corpus makes that class of defect mechanical to detect.
+illegal ones keep surviving several reviews before being caught by hand — a
+`create` written with square brackets, a selector giving half of a natural
+identity, a trailing comma in a predicate list. A corpus makes that class of
+defect mechanical to detect.
 
 ### D.1 Format
 
@@ -4284,14 +4864,29 @@ The corpus is a JSON array of cases. Each case is an object:
 `expect` is one of two shapes:
 
 ```text
-{ "status": "ok", "effects": [ … ], "danglingReferences": [ … ] }
+{ "status": "ok", "effects": [ … ], "danglingReferences": [ … ], "warnings": [ … ] }
 { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 }
 ```
 
-- For an `ok` case, `effects` is the concatenation, in order, of the `effects` (or `applications`) arrays that plan mode produces for the script (section "12.4.1"), restricted to the comparable fields: `kind`, `componentType`, `property`, `language`, `oldValue`, `newValue`, `position`. An implementation passes the case when its plan document yields exactly that list, **and** when applying the script for real leaves a dictionary from which re-running plan mode yields no effect at all (idempotence of the observed state, not of the command).
-- For an `error` case, the implementation passes when it raises exactly `code`, of exactly that `kind`, on exactly the command at `commandIndex` (1-based; `0` for an error carried by the script as a whole, such as a pragma error), **and** when the dictionary is unchanged afterwards (section "12.2").
+- For an `ok` case, `effects` is the concatenation, in order, of the `effects` (or `applications`) arrays that plan mode produces for the script (section "12.4.1"), restricted to the comparable fields. **This list is the single normative statement of which fields of an effect are compared**, and it is exhaustive: `kind`, `componentType`, `property`, `language`, `languageKind`, `oldValue`, `newValue`, `position`, `fromPosition`, `toPosition`. The remaining fields of an effect — `fromParent` and `toParent`, which contain a `path` — are informative and are never compared. An implementation passes the case when its plan document yields exactly that list, and when applying the script for real produces the same effects.
+- `danglingReferences` and `warnings` are compared when the case states them, and are expected to be empty when it does not.
+- For an `error` case, the implementation passes when it raises exactly `code`, of exactly that `kind`, on exactly the operation at `commandIndex`, **and** when the dictionary is unchanged afterwards (section "12.2"). `commandIndex` is the `index` of section "12.4.1": 1-based, flat across the whole script, counting a block header as an operation of its own, and `0` for an error carried by the script as a whole, such as a pragma error.
 - `message` text is never compared. Neither is `path`, which is informative.
 - An `error` case whose `kind` is `static` additionally requires that no command of the script has been applied even partially, and that the error be reported before any dictionary access.
+
+Most commands of this language are not idempotent and were never meant to be:
+running `C-001` twice raises `CANNOT_CREATE_DUPLICATE`, running `C-022` twice
+deletes nothing the second time. Where re-running a script *is* meaningful —
+`upsert`, `ensure`, `set` — a case may state what the second run does, with an
+optional field:
+
+```text
+"rerun": "noEffect" | "error:CANNOT_CREATE_DUPLICATE"
+```
+
+An implementation checks `rerun` only when the case states it. Cases `C-028`,
+`C-029` and `C-033` state it, since the idempotence of `upsert` and of `ensure`
+is one of the properties this specification most needs held to.
 
 ### D.2 The standard fixture
 
@@ -4467,7 +5062,7 @@ implementation MAY add cases; it MUST pass these.
     "description": "move is not allowed in a block body",
     "dictionary": "standard",
     "script": "sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1] {\n  move example#1 at end\n}",
-    "expect": { "status": "error", "code": "MOVE_NOT_ALLOWED_IN_BLOCK", "kind": "static", "commandIndex": 1 } },
+    "expect": { "status": "error", "code": "MOVE_NOT_ALLOWED_IN_BLOCK", "kind": "static", "commandIndex": 2 } },
 
   { "id": "C-018", "section": "10", "syntax": "LiftPatchRef",
     "description": "a reference property is compared to a chain in a selector",
@@ -4544,11 +5139,228 @@ implementation MAY add cases; it MUST pass these.
     "description": "the idiomatic upsert creates the entry and the sense when no match exists",
     "dictionary": "standard",
     "script": "p /mimi/lizard",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mimi" },
+      { "kind": "componentCreated", "componentType": "sense", "position": 1 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" } ] } },
+
+  { "id": "C-029", "section": "8.3", "syntax": "LiftPatchRef",
+    "description": "ensure succeeds and changes nothing",
+    "dictionary": "standard",
+    "script": "ensure sense[gloss@en = \"taro\"] under entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [] } },
+
+  { "id": "C-030", "section": "5.3.2.1", "syntax": "LiftPatchRef",
+    "description": "an hn that matches nothing is NOT_FOUND, not a code of its own",
+    "dictionary": "standard",
+    "script": "ensure entry[form@tww = \"mami\", hn = 7]",
+    "expect": { "status": "error", "code": "NOT_FOUND", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-031", "section": "5.4.2", "syntax": "LiftPatchRef",
+    "description": "an ordinal is allowed as the step of an on clause, and forbidden as a property",
+    "dictionary": "standard",
+    "script": "set text@tpi = \"mi shutim pik\"\n  on example#1\n  within sense[category = \"Noun\"]\n  within entry[form@tww = \"mami\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "text", "language": "tpi", "oldValue": null, "newValue": "mi shutim pik" } ] } },
+
+  { "id": "C-032", "section": "6.3", "syntax": "LiftPatchRef",
+    "description": "ensure binds a label, which a later command uses as a step",
+    "dictionary": "standard",
+    "script": "ensure entry[form@tww = \"memi\"] as $memi\ncreate sense(gloss@en = \"puppy\") under $memi",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "puppy" } ] } },
+
+  { "id": "C-033", "section": "Part 3, 8", "syntax": "LiftPatchShort",
+    "description": "the idiomatic upsert takes its select branch and changes nothing when the pair exists",
+    "dictionary": "standard",
+    "script": "p /mami/taro",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [] } },
+
+  { "id": "C-034", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "a same-parent move reports one componentMoved with both positions",
+    "dictionary": "standard",
+    "script": "move example#1\n  under sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]\n  at end",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 2 } ] } },
+
+  { "id": "C-035", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "moving to the position already occupied is refused",
+    "dictionary": "standard",
+    "script": "move example#1\n  under sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]\n  at beginning",
+    "expect": { "status": "error", "code": "MOVING_TO_CURRENT_POSITION", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-036", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "a move may not make a component its own ancestor",
+    "dictionary": "standard",
+    "script": "move sense[gloss@en = \"pig\"]\n  under entry[form@tww = \"mami\", hn = 1]\n  under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  at end",
+    "expect": { "status": "error", "code": "SELF_ANCESTOR", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-037", "section": "5.6", "syntax": "LiftPatchRef",
+    "description": "each applies the assignment to every matched component, in document order",
+    "dictionary": "standard",
+    "script": "set category = \"Verb\"\n  on each sense[exists(gloss@en)]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "category", "language": null, "oldValue": "Noun", "newValue": "Verb" },
+      { "kind": "propertyReplaced", "property": "category", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-038", "section": "5.6", "syntax": "LiftPatchRef",
+    "description": "a marked step matching nothing succeeds, changes nothing, and warns",
+    "dictionary": "standard",
+    "script": "delete all example[text@tww ~ \"^draft\"]\n  under sense[gloss@en = \"pork\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [],
+      "warnings": [ { "code": "COMMAND_APPLIES_TO_NO_COMPONENT" } ] } },
+
+  { "id": "C-039", "section": "5.5.1", "syntax": "LiftPatchRef",
+    "description": "a multi-language literal is the sequence of its qualified assignments",
+    "dictionary": "standard",
+    "script": "set definition = { en: \"A pig\", fr: \"Un cochon\" }\n  on sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "definition", "language": "en", "oldValue": "A four-legged terrestrial animal", "newValue": "A pig" },
+      { "kind": "propertySet", "property": "definition", "language": "fr", "oldValue": null, "newValue": "Un cochon" } ] } },
+
+  { "id": "C-040", "section": "9.3.1", "syntax": "LiftPatchRef",
+    "description": "clear @* on an optional multitext removes one effect per language actually removed",
+    "dictionary": "standard",
+    "script": "clear definition@*\n  on sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyRemoved", "property": "definition", "language": "en", "oldValue": "A four-legged terrestrial animal", "newValue": null } ] } },
+
+  { "id": "C-041", "section": "2.1.1", "syntax": "LiftPatchRef",
+    "description": "language-default changes which language an unqualified assignment writes",
+    "dictionary": "standard",
+    "script": "language-default meta = \"fr\"\ncreate sense(gloss = \"chiot\") under entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "fr", "oldValue": null, "newValue": "chiot" } ] } },
+
+  { "id": "C-042", "section": "2.1.3", "syntax": "LiftPatchRef",
+    "description": "language-create is an operation, and is rolled back with the rest of a failing script",
+    "dictionary": "standard",
+    "script": "language-create object = \"hui\"\ncreate entry(form@hui = \"mami\")\ncreate sense(gloss@en = \"piglet\") under entry[form@tww = \"mami\"]",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 3 } },
+
+  { "id": "C-043", "section": "2.1.2", "syntax": "LiftPatchRef",
+    "description": "a with header binds defaults for its body and is not an operation",
+    "dictionary": "standard",
+    "script": "with object = \"tpi\", meta = \"fr\" {\n  create entry(form = \"pikpik\") as $m\n  create sense(gloss = \"lezard\") under $m\n}",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tpi", "oldValue": null, "newValue": "pikpik" },
+      { "kind": "componentCreated", "componentType": "sense", "position": 1 },
+      { "kind": "propertySet", "property": "gloss", "language": "fr", "oldValue": null, "newValue": "lezard" } ] } },
+
+  { "id": "C-044", "section": "11", "syntax": "LiftPatchRef",
+    "description": "a block header is an operation and may bind a label visible after the block",
+    "dictionary": "standard",
+    "script": "entry[form@tww = \"memi\"] as $memi {\n  create sense(gloss@en = \"puppy\")\n}\ncreate note(type = \"general\", text@en = \"checked\") under $memi",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "puppy" },
+      { "kind": "componentCreated", "componentType": "note", "position": 1 },
+      { "kind": "propertySet", "property": "text", "language": "en", "oldValue": null, "newValue": "checked" } ] } },
+
+  { "id": "C-045", "section": "5.1.3", "syntax": "LiftPatchRef",
+    "description": "a has predicate refines strategy S3 on a component type that is not an entry",
+    "dictionary": "standard",
+    "script": "set category = \"Verb\"\n  on sense[gloss@en = \"pig\", has example[text@tww = \"a mami jefo\"]]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "category", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-046", "section": "7.3", "syntax": "LiftPatchRef",
+    "description": "a chain that does not reach the root is refused before any lookup",
+    "dictionary": "standard",
+    "script": "set category = \"Verb\" on sense[gloss@en = \"pig\"]",
+    "expect": { "status": "error", "code": "INCOMPLETE_ANCESTOR_CHAIN", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-047", "section": "7.2", "syntax": "LiftPatchRef",
+    "description": "a component command other than one targeting an entry needs a parent clause",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"piglet\")",
+    "expect": { "status": "error", "code": "MISSING_PARENT_CLAUSE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-048", "section": "5.1.2", "syntax": "LiftPatchRef",
+    "description": "a regular-expression operator does not apply to a reference property",
+    "dictionary": "standard",
+    "script": "delete all relation[target ~ entry[form@tww = \"mami\", hn = 1]] under entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "OPERATOR_NOT_APPLICABLE_TO_DATATYPE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-049", "section": "10", "syntax": "LiftPatchRef",
+    "description": "a reference target that is neither an entry nor a sense is a static error",
+    "dictionary": "standard",
+    "script": "set target = example[text@tww = \"a mami jefi\"] of sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  on relation#1\n  of entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "INVALID_TARGET", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-050", "section": "5.3.2.2", "syntax": "LiftPatchRef",
+    "description": "has-gloss is not admitted in a create initializer",
+    "dictionary": "standard",
+    "script": "create entry(form@tww = \"mimi\", has-gloss@en = \"pig\")",
+    "expect": { "status": "error", "code": "COMMAND_NOT_ALLOWING_HAS", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-051", "section": "5.3.2.1", "syntax": "LiftPatchRef",
+    "description": "hn may not be used without a form",
+    "dictionary": "standard",
+    "script": "delete entry[hn = 1]",
+    "expect": { "status": "error", "code": "HN_CANNOT_BE_USED_ALONE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-052", "section": "Part 3, 3.3", "syntax": "LiftPatchShort",
+    "description": "an indented block anchors its commands to the component of the line above",
+    "dictionary": "standard",
+    "script": "c e(\"mimi\")\n  c s(\"lizard\")\n    s (c = \"Noun\")",
     "expect": { "status": "ok", "effects": [
       { "kind": "componentCreated", "componentType": "entry", "position": null },
       { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mimi" },
       { "kind": "componentCreated", "componentType": "sense", "position": 1 },
-      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" } ] } }
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" },
+      { "kind": "propertySet", "property": "category", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+
+  { "id": "C-053", "section": "Part 3, 8", "syntax": "LiftPatchShort",
+    "description": "the idiomatic upsert extends to the third abbreviated step, the example text",
+    "dictionary": "standard",
+    "script": "p /mimi/lizard/\"a mimi jefi\"",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mimi" },
+      { "kind": "componentCreated", "componentType": "sense", "position": 1 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" },
+      { "kind": "componentCreated", "componentType": "example", "position": 1 },
+      { "kind": "propertySet", "property": "text", "language": "tww", "oldValue": null, "newValue": "a mimi jefi" } ] } },
+
+  { "id": "C-054", "section": "Part 3, 3", "syntax": "LiftPatchShort",
+    "description": "a path-only create or upsert needs abbreviated steps",
+    "dictionary": "standard",
+    "script": "p /e[f=\"mami\"]/s[g=\"pig\"]",
+    "expect": { "status": "error", "code": "CONSTRUCTOR_REQUIRED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-055", "section": "Part 3, 6.1", "syntax": "LiftPatchShort",
+    "description": "there is no abbreviated step below the third position",
+    "dictionary": "standard",
+    "script": "d /mami/pig/\"a mami jefi\"/foo",
+    "expect": { "status": "error", "code": "ABBREVIATED_STEP_NOT_ALLOWED_HERE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-056", "section": "1.1", "syntax": "LiftPatchShort",
+    "description": "a reference-syntax script read as a concise document applies nothing, and says so",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"puppy\") under entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [],
+      "warnings": [ { "code": "NO_COMMAND_RECOGNIZED" } ] } },
+
+  { "id": "C-057", "section": "2.1.3", "syntax": "LiftPatchRef",
+    "description": "language-create is an operation and carries a languageCreated effect",
+    "dictionary": "standard",
+    "script": "language-create object = \"hui\"\ncreate entry(form@hui = \"mimi\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "languageCreated", "languageKind": "object", "language": "hui" },
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "hui", "oldValue": null, "newValue": "mimi" } ] } },
+
+  { "id": "C-058", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "a move to another parent reports one componentMoved with both positions",
+    "dictionary": "standard",
+    "script": "move example#1\n  under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  under sense[gloss@en = \"pork\"] of entry[form@tww = \"mami\", hn = 1]\n  at end",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 1 } ] } }
 ]
 ```
 
@@ -4558,10 +5370,11 @@ own in addition, and MUST report `SYNTAX_ERROR` for comparison purposes.
 
 ### D.4 Keeping the corpus and the document in step
 
-Two rules keep this appendix honest:
+Three rules keep this appendix honest:
 
 1. **Every normative example of Parts 1 to 3 SHOULD appear in the corpus**, with its stated outcome. An example that no case covers is an example nobody has checked.
 2. **A change to this specification that changes an outcome MUST change the corpus in the same edit.** The corpus is the part of this document that can be run, and it is therefore the part that decides, in practice, what the language is.
+3. **Every code of Appendix B SHOULD be raised by at least one case**, and every warning of B.4 reported by at least one. A code that no case exercises is a code against which no implementation has ever been checked, and it is usually a code that turns out to name a condition another code already names. The corpus of version 1.0 does not yet reach every code; extending it is the first thing to do to it.
 
 An implementation reports its corpus result as a table of `id` and pass/fail,
 and a conformance claim cites the corpus version it passed.
