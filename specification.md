@@ -7,7 +7,7 @@ Title: "LiftPatch: a mutation language for the LIFT data model"
 
 # LiftPatch: a mutation language for the LIFT data model
 
-This document defines a command DSL, called *LiftPatch*, for creating, updating, deleting, upserting, and moving components and properties in a dictionary based on the LIFT data model. The *LiftPatch* language is not a serialization format: it is a mutation command language for updating the dictionary content. The language preserves the LIFT component hierarchy while making component identity, parentage, property availability, creation, selection, and mutation semantics explicit.
+This document defines a command domain specific language (DSL), called *LiftPatch*, for creating, updating, deleting, upserting, and moving components and properties in a dictionary based on the LIFT data model. The *LiftPatch* language is not a serialization format: it is a mutation command language for updating the dictionary content. The language preserves the LIFT component hierarchy while making component identity, parentage, property availability, creation, selection, and mutation semantics explicit.
 
 The LIFT dictionary format is intended for the linguistic description of the
 lexicon of a language. It a tree-like structure; it contains *components*, such
@@ -140,8 +140,14 @@ again where they apply:
 - `move entry[...]` is a syntax error (section "8.5");
 - an `entry` cannot be selected by an ordinal (section "5.3.3").
 
-Every other component type does live in an ordered list — the list of its
-same-type siblings under one parent — and is positionable by all three means.
+Below the root, a component type is **not** automatically positionable either.
+How the same-type children of one parent are held — in an ordered list, in a map
+keyed by their `type`, or not held as a collection at all — is a property of the
+component type, declared by the metamodel, and it decides which selectors,
+which positioning clauses and which verbs apply to it. The three *component
+kinds* are defined in section "3.1", and every rule of this specification that
+speaks of position, of ordinals, of type keys or of `move` is stated in terms of
+them.
 
 Since a lift dictionary is not a monolingual dictionary, it also has:
 
@@ -279,6 +285,7 @@ A **component** is a structural LIFT node such as an `entry`, `sense`, or `examp
 | Note | `note` |
 | Field | `field` |
 | Translation | `translation` |
+| Category | `category` |
  
 This table is exhaustive.
 
@@ -291,7 +298,7 @@ The allowed parent-child relationships are:
 |---|---|
 | Dictionary | `entry`|
 | Entry | `sense`, `etymology`, `variant`, `relation`, `pronunciation`, `reversal`, `trait`, `annotation`, `note`, `field` |
-| Sense | `sense`, `example`, `relation`, `illustration`, `reversal`, `trait`, `annotation`, `note`, `field` |
+| Sense | `sense`, `example`, `relation`, `illustration`, `reversal`, `trait`, `annotation`, `note`, `field`, `category` |
 | Variant | `pronunciation`, `relation`, `trait`, `annotation`, `field` |
 | Pronunciation | `media`, `trait`, `annotation`, `field` |
 | Example | `translation`, `trait`, `annotation`, `field` |
@@ -305,6 +312,7 @@ The allowed parent-child relationships are:
 | Note | `annotation` |
 | Field | `annotation` |
 | Translation |  |
+| Category | `trait` |
 
 This table is exhaustive: every component type of the component table appears as
 a row, and a row with an empty right-hand cell denotes a component type that
@@ -314,20 +322,93 @@ parent listed in the table.
 Creating a component under an illegal parent (or moving a component towards an
 illegal parent) must fail with an 'ILLEGAL_PARENT' error.
 
-All parents can have multiple child components of the same type. For
-instance, a `sense` component can have multiple `example` children. Under a
-given parent, the children of each type form an ordered list; a child can be
-selected by its position **in the list of its same-type siblings** — not by its
-position among all the children of the parent — as described below in section
-"5.3.3 Ordinal selectors".
+Most parents can have multiple child components of the same type. For
+instance, a `sense` component can have multiple `example` children. How those
+same-type children are held, and therefore how one of them is designated, is
+decided by the *component kind* of the child type, defined in section "3.1".
 
 The metamodel states which children a component type *may* have, and never how
-many it must have: there is no minimum cardinality anywhere in this language.
-Consequently a component may legitimately be left with no children of a type it
-allows — `delete all sense[...] under entry[...]` leaves an entry with no sense,
-and that is not an error. Whether such a state is desirable lexicography is a
-question for the editor, not for this language; whether the dictionary
+many it must have: there is no minimum cardinality anywhere in this language,
+with the single exception of a singleton child, which always exists (section
+"3.1"). Consequently a component may legitimately be left with no children of a
+type it allows — `delete all sense[...] under entry[...]` leaves an entry with no
+sense, and that is not an error. Whether such a state is desirable lexicography
+is a question for the editor, not for this language; whether the dictionary
 management system accepts it is a question for that system.
+
+### 3.1 Component kinds
+
+Every component type has exactly one *component kind*, declared by the metamodel
+(Appendix A, `componentKind`). The kinds form this hierarchy:
+
+```text
+- singleton components
+- non-singleton components
+  - ordered components
+  - typed components
+```
+
+The kind answers one question — *how are the same-type children of one parent
+held, and how is one of them designated?* — and every rule about position,
+ordinals, type keys, `move` and the `at` clause follows from it.
+
+| Kind | How the same-type children are held | Designated by | Component types |
+|---|---|---|---|
+| **ordered** | an ordered list, whose order the script controls | a selector, or the ordinal `#n` (section "5.3.3") | `sense`, `example`, `annotation`, `relation`, `reversal`, `variant`, `illustration`, `media`, `pronunciation`, `etymology` — and `entry`, with the reservations of section "2" |
+| **typed** | a map keyed by the `type` property | a selector, or the type key `^t` (section "5.3.4") | `trait`, `note`, `field`, `translation` |
+| **singleton** | not a collection: at most one, and it always exists | the component type name alone (strategy S7, section "5.1.3") | `category` |
+
+**Ordered components.** These live in an ordered list of same-type siblings under
+one parent, and that order is meaningful: the order of the `sense` children of an
+entry, of the `example` children of a sense and of the `annotation` children of
+anything is chosen by the lexicographer and carries editorial intent. An ordered
+component is therefore the only kind that takes an ordinal, the only kind that
+takes an `at POSITION` clause (section "6.2"), and the only kind that `move`
+accepts (section "8.5").
+
+`entry` is an ordered component whose list is maintained by the dictionary rather
+than by this language; the three consequences are stated in section "2" and are
+not repeated here.
+
+**Typed components.** These do not live in an ordered list. They live in a map
+whose key is their `type` property, which is why `type` is the whole of their
+natural identity property set (section "5.2"): under one parent, no two `note`
+children may share a `type`, and asking for "the `note` whose type is `general`"
+always designates at most one component. There is no first or second `note`, so:
+
+- an ordinal on a typed component raises `COMPONENT_NOT_ORDERED`, a static error;
+- an `at POSITION` clause on a command creating a typed component raises `COMPONENT_NOT_ORDERED`;
+- `move` on a typed component raises `COMPONENT_NOT_ORDERED`. A typed component is re-keyed by writing its `type`, not by moving it, and is re-parented by deleting it and creating it under the new parent;
+- the type key `^t` (section "5.3.4") is the concise way to designate one, in both syntaxes: `note^general` is `note[type = "general"]`.
+
+**Singleton components.** A singleton is not a collection at all: a host
+component has exactly one child of that type, it always has one, and it never has
+two. `category` is the only singleton of the current metamodel, and it exists on
+`sense` only. The consequences are stated once here and referred to elsewhere:
+
+- a singleton is **never created and never deleted**. `create category(...)`, `upsert category(...)`, `delete category` and `move category` all raise `SINGLETON_CANNOT_BE_CREATED_OR_DELETED`, a static error. It comes into existence with its host and disappears with it;
+- a singleton is designated by **its component type name alone**, with no selector, no ordinal and no type key — strategy S7 of section "5.1.3". `category[value = "Noun"]` as a *unique* selector raises `SINGLETON_TAKES_NO_SELECTOR`, a static error, because there is nothing to choose among;
+- as a **filtering** selector, however — inside a `has` predicate, or on the parent side of a `within` / `/` link — a singleton step may carry an ordinary predicate list like any other step (section "5.1.4"), since a filtering selector asks a question rather than making a choice: `sense[has category[value = "Verb"]]` is the way to ask which senses are verbs;
+- a singleton has an empty natural identity property set, and the uniqueness invariant of section "5.2" is vacuous for it;
+- its properties are ordinary properties, written and read by `set`, `update` and `clear` exactly as on any other component: `set value = "Noun" on category of sense[...]`.
+
+A singleton always exists, but its properties need not be set. `category` always
+exists on a sense; `category.value` may be unset, and a sense whose category
+carries no value is a sense whose grammatical category has not been stated.
+`clear value on category of sense[...]` returns it to that state.
+
+**Which code is reported.** A step can break a kind rule and another rule at the
+same time, so the order in which a validator reports is fixed, and it is this:
+
+1. the **kind** of the component type is checked first, because it decides what the step may contain at all: `SINGLETON_CANNOT_BE_CREATED_OR_DELETED` for a verb a singleton does not accept, then `SINGLETON_TAKES_NO_SELECTOR`, `COMPONENT_NOT_ORDERED` and `COMPONENT_NOT_TYPED` for a device the kind does not admit;
+2. only then are the ordinary selector rules applied — `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`, `INCOMPLETE_SELECTOR`, `DUPLICATE_SELECTOR`, `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`.
+
+So `category[value = "Noun"]` in an `on` clause is
+`SINGLETON_TAKES_NO_SELECTOR` and not `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`,
+even though the predicate would be refused on its own; and `move note^general …`
+is `COMPONENT_NOT_ORDERED`, reported against the verb, rather than
+`COMPONENT_NOT_TYPED`, which does not apply since `note` *is* typed. All of these
+are static errors, so a script containing one changes nothing (section "12.3").
 
 ## 4. Properties
 
@@ -349,7 +430,7 @@ The following table lists the properties. Each row gives a property name; the fo
   - `O` — object language qualifier required or defaultable, for example `form@tww`.
   - `M` — meta language qualifier required or defaultable, for example `gloss@en`.
   - `—` — no language qualifier.
-- `Required at creation`: indicate whether this property must be initialized with a value at creation. For a multitext, this means that at least one qualified value must be set.
+- `Required at creation`: indicate whether this property must be initialized with a value at creation. For a multitext, this means that at least one qualified value must be set. On a **singleton** component type (section "3.1"), which is never created, every property is necessarily "no": there is no creation at which to require one.
 - `Natural identity`: indicate if this property belongs to the *natural identity property set* of the component type, as defined in section "5.2". A component type has a natural identity property set of zero, one, or two properties. When a multitext belongs to that set, only *same-language* values are compared: a qualified value `p@L` of one component is compared with the qualified value `p@L` of a sibling for the same language `L`, never with a value in another language, and unset qualified values never take part in the comparison.
 
 The table is exhaustive and normative for semantic validation. It is the
@@ -362,7 +443,7 @@ normative metamodel"; in case of divergence, Appendix A prevails.
 | Entry | `morpheme` | string | — | no | no |
 | Sense | `gloss` | multitext | M | yes, at least one qualified value | yes: one qualified value |
 | Sense | `definition` | multitext | M | no | no |
-| Sense | `category` | string | — | no | no |
+| Category | `value` | string | — | no | no |
 | Example | `text` | multitext | O | yes, at least one qualified value | yes: one qualified value |
 | Etymology | `form` | multitext | O | yes, at least one qualified value | part of `type + form` |
 | Etymology | `gloss` | multitext | M | no | no |
@@ -466,15 +547,15 @@ transcription@tww
 The `@lang` key allows to refer to a qualified string value of a multitext property
 value, i.e. a "sub-entries".
 
-The pseudo-properties `hn`, `id` and the ordinal `#n` (section "5.3") are not
-properties and never accept a language key. The pseudo-predicate `has-gloss` does accept
+The pseudo-properties `hn`, `id`, the ordinal `#n` and the type key `^t`
+(section "5.3") are not properties and never accept a language key. The pseudo-predicate `has-gloss` does accept
 one, because it is a shorthand for a predicate over the multitext `gloss`
 (section "5.3.2.2").
 
 The validator MUST reject a combination of a scalar property with a language key with error `LANG_KEY_NOT_SUPPORTED_ON_SCALAR`. For example, the following are invalid:
 
 ```text
-category@en
+morpheme@en
 value@en
 ```
 
@@ -505,10 +586,24 @@ A *step* denotes one component type together with the conditions it must
 satisfy:
 
 ```text
-STEP        ::= COMPONENT-NAME [ '[' PREDICATE-LIST ']' ] [ ORDINAL ]
-ORDINAL     ::= '#' INTEGER
+STEP           ::= ORDERED-STEP | TYPED-STEP | SINGLETON-STEP
+ORDERED-STEP   ::= COMPONENT-NAME ( '[' PREDICATE-LIST ']' | ORDINAL )
+TYPED-STEP     ::= COMPONENT-NAME ( '[' PREDICATE-LIST ']' | TYPE-KEY )
+SINGLETON-STEP ::= COMPONENT-NAME [ '[' PREDICATE-LIST ']' ]
+ORDINAL        ::= '#' INTEGER
+TYPE-KEY       ::= '^' ( BARE-WORD | STRING )
 PREDICATE-LIST ::= PREDICATE { ',' PREDICATE }
 ```
+
+Which of the three forms a step takes is decided by the **component kind** of
+`COMPONENT-NAME` (section "3.1"), which the metamodel declares: the ordinal `#n`
+belongs to ordered components, the type key `^t` to typed components, and the
+bare component name — a step with nothing after it — to singletons. Using one on
+the wrong kind is a static error: `COMPONENT_NOT_ORDERED` for an ordinal on a
+type that is not ordered, `COMPONENT_NOT_TYPED` for a type key on a type that is
+not typed, and `SINGLETON_TAKES_NO_SELECTOR` for a unique selector that gives a
+singleton anything at all. The predicate list of a `SINGLETON-STEP` is available
+in a filtering selector only (section "5.1.4").
 
 The predicates of a list are combined by conjunction: a component matches the
 step when it matches *every* predicate of the list. A step may also be replaced
@@ -567,7 +662,7 @@ We distinguish:
 - On a multitext property, `p` must be written `p@L` (or `p@*`, section "4.4.1");
 an omitted qualifier means the applicable default language
 - On a scalar property, a qualifier is forbidden (`LANG_KEY_NOT_SUPPORTED_ON_SCALAR`).
-- `exists(p)` and `absent(p)` are exact complements: for the same `p`, exactly one of them holds on any given component. They accept a scalar property as well as a multitext one, since "the sense that has no `category`" is as ordinary a query as "the sense that has no French definition":
+- `exists(p)` and `absent(p)` are exact complements: for the same `p`, exactly one of them holds on any given component. They accept a scalar property as well as a multitext one, since "the trait that has no `value`" is as ordinary a query as "the sense that has no French definition":
   - on a **scalar** property, `exists(p)` means that the property has a value, and `absent(p)` that it has none. No qualifier may be written (`LANG_KEY_NOT_SUPPORTED_ON_SCALAR`);
   - on a **multitext** property written without a qualifier, `exists(p)` means that at least one qualified value exists, and `absent(p)` that none does;
   - on a **multitext** property written with a language qualifier, `exists(p@L)` means that a value exists for that language, and `absent(p@L)` that no value exists for it, whatever the other languages hold;
@@ -618,7 +713,9 @@ list is exhaustive.
 | S2 | Persistent identifier | `[id = "…"]` | `entry` and `sense` only |
 | S3 | Natural identity | all the properties of the natural identity property set of the component type, each given exactly once; a multitext identity property with exactly one language qualifier; OPTIONALLY refined by one or more `has` predicates | every component type whose natural identity property set is non-empty |
 | S4 | Entry lookup | a qualified `form` predicate, OPTIONALLY refined by **either** exactly one `hn` predicate **or** one or more `has` / `has-gloss` predicates | `entry` only |
-| S5 | Ordinal | `#n` (deprecated alias: `[index = n]`) | every component type except `entry` |
+| S5 | Ordinal | `#n` (deprecated alias: `[index = n]`) | **ordered** component types only, and not `entry` |
+| S6 | Type key | `^t` | **typed** component types only |
+| S7 | Singleton | the component type name alone, with nothing after it | **singleton** component types only |
 
 Notes:
 
@@ -627,7 +724,10 @@ Notes:
 - A `has` refinement is available on **every** component type, not only on `entry`. It is admitted in a unique selector because `has` can only ever narrow a candidate set, so it cannot make a unique selector less unique; because it is the disambiguator this specification recommends over `hn` (section "5.3.2.1"); and because without it there is no way to tell two same-type siblings apart by their content when their identity keys are defined for different languages.
 - `has-gloss` remains an `entry`-only shorthand (section "5.3.2.2"): on other component types, write the `has` predicate out.
 - S4 without refinement may still resolve to several entries (homophones); this raises `AMBIGUOUS_REFERENCE` like any other ambiguous selection.
-- The ordinal `#n` may not be combined with any predicate list, and no refinement applies to S1, S2 or S5.
+- The ordinal `#n` and the type key `^t` may not be combined with any predicate list, and no refinement applies to S1, S2, S5, S6 or S7.
+- **S5, S6 and S7 follow the component kinds** (section "3.1") and are mutually exclusive: which of the three is available on a component type is decided by the metamodel, never by the command, and at most one of them ever is. Using the wrong one is `COMPONENT_NOT_ORDERED`, `COMPONENT_NOT_TYPED` or `SINGLETON_TAKES_NO_SELECTOR` (section "3.1"), never `INCOMPLETE_SELECTOR`. `entry` is the one component type for which none of the three is available — it is ordered, but by the dictionary rather than by this language (section "2") — and S4 is what selects it.
+- **S6 is a spelling of S3, not a new lookup.** The natural identity property set of a typed component type is exactly `{type}` (section "3.1"), so `note^general` and `note[type = "general"]` are the same selector written two ways, and both are strategy-complete. `^t` is RECOMMENDED, being shorter and stating that the component type is a typed one; S3 remains available and is what a script writes when it wants the `type` predicate to sit beside a `has` refinement, which `^t` does not accept.
+- **S7 is the absence of a selector**, and it is complete on its own: a singleton host has exactly one such child, so naming the type names the component. Since `category` is its only instance in the current metamodel, `on category of sense[...]` is the whole of it.
 
 If a selector combines two strategies — for instance an `id` and a natural
 identity property, or the deprecated `[index = n]` predicate together with any
@@ -635,9 +735,11 @@ other predicate — the validator MUST reject it with `DUPLICATE_SELECTOR`. If i
 uses none — for instance a predicate list that does not cover the whole natural
 identity property set, or a list made only of `has` predicates, which are a
 refinement and never a strategy on their own — the validator MUST reject it with
-`INCOMPLETE_SELECTOR`.
+`INCOMPLETE_SELECTOR`. A `SINGLETON-STEP` is the one step that uses no predicate
+and is nevertheless complete, by S7; it never raises `INCOMPLETE_SELECTOR`.
 
-`sense[gloss@en = "pig"]#2` is a syntax error (rejected by the parser).
+`sense[gloss@en = "pig"]#2` and `note[text@en = "…"]^general` are syntax errors
+(rejected by the parser).
 
 A *filtering selector*, by contrast with an unique selector, is under none of these constraints: see section "5.1.4".
 
@@ -652,11 +754,16 @@ entry[form@tww = "mami", has-gloss@en="pig"]
 entry[form@tww = "mami", has sense[gloss@en = "pig"]]
 sense[gloss@en = "pig", has example[text@tww ~ "jefi"]]
 example#1
+note^general
+trait^"CV pattern"
+category
 ```
 
 Of these, `entry[form@tww = "mami", has sense[...]]` is strategy S4 refined by a
 `has` predicate, and `sense[gloss@en = "pig", has example[...]]` is strategy S3
-refined by one, on a component type that is not an `entry`.
+refined by one, on a component type that is not an `entry`. The last three are
+S5, S6 and S7: an ordinal on an ordered component, a type key on a typed one, and
+the bare name of a singleton.
 
 #### 5.1.4 Filtering selectors
 
@@ -665,11 +772,24 @@ parent side of a `within` / `/` link, a step inside a `has` predicate, or a
 target step marked `each` / `all` / `*` — may contain:
 
 - any property allowed on the component type, be it an identity property or not, in any number, with any of the predicate forms of section "5.1.2", and, on a multitext, any number of qualified values and the wildcard `@*`;
-- no pseudo-property: `id`, `hn`, `has-gloss` and the ordinal `#n` are forbidden there, and raise `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`. The `has` predicate is not a pseudo-property in this sense and is allowed, including nested.
+- no pseudo-property: `id`, `hn`, `has-gloss`, the ordinal `#n` and the type key `^t` are forbidden there, and raise `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`. The `has` predicate is not a pseudo-property in this sense and is allowed, including nested.
+
+The component kind (section "3.1") constrains a unique selector and does not
+constrain a filtering one, because a filtering selector states a condition rather
+than making a choice. Two consequences:
+
+- a **typed** component may be filtered by any of its properties, `type` included, written out as an ordinary predicate: `within note[type = "general"]` and `has field[text@en ~ "^draft"]` are both legal. What is forbidden there is the *key* spelling `^t`, exactly as the ordinal `#n` is forbidden while a content predicate is not;
+- a **singleton** step, which carries no selector when it is a unique selector (strategy S7), **may** carry an ordinary predicate list when it is a filtering one. This is the only way to ask a question about a singleton, and it is the idiom for querying the grammatical category of a sense:
+
+```text
+sense[has category[value = "Verb"]]
+within category[value = "Noun"]
+```
 
 A filtering selector may match zero, one, or several components; what must be
 unambiguous is the result of the whole chain, not the result of each step (see
-section "7.4").
+section "7.4"). A filtering step on a singleton matches zero or one component,
+never more, since the host has at most one.
 
 #### 5.1.5 Resolution rules
 
@@ -715,9 +835,20 @@ permitted, and no identity-based operation is available for `T`. Every rule of
 this specification that requires "all the properties of the natural identity
 property set" is therefore automatically inapplicable to such a component type,
 and every rule that matches an existing component by identity key never matches
-one. `entry` is the only component type with an empty natural identity property
-set in the current metamodel; the strategies available for selecting an entry
-are listed in section "5.1.3" (strategy S4) and detailed in section "5.3.2".
+one. Two component types have an empty set in the current metamodel, for opposite
+reasons: `entry`, because the dictionary may legitimately hold homophones — the
+strategies available for selecting one are listed in section "5.1.3" (strategy
+S4) and detailed in section "5.3.2" — and `category`, because it is a singleton
+and there is never a second one to tell it apart from (strategy S7).
+
+**Natural identity and the typed kind.** A **typed** component type (section
+"3.1") is exactly a component type whose natural identity property set is the
+single scalar property `type`. This is not a coincidence to be maintained by hand
+in two places: the map-like behaviour of `trait`, `note`, `field` and
+`translation` *is* the uniqueness invariant applied to `{type}`. Under one
+parent, two `note` children may not share a `type`, which is what makes
+`note[type = "general"]` — and its key spelling `note^general` — designate at most
+one component without any further predicate.
 
 **Natural, not persistent.** Identity properties are not a persistent,
 invariant identity: the gloss of a sense can be changed, which changes its
@@ -770,7 +901,8 @@ These pseudo properties are defined. They do not participate in component identi
 | `id` | system-managed persistent identifier | selector and reference values only |
 | `hn` | dictionary-assigned entry-disambiguation key | entry selector only, with qualified `form` |
 | `has-gloss@M` | selector predicate, shorthand for `has sense[gloss@M = …]` | entry selector only, with qualified `form` |
-| `#n` (ordinal) | positional selector, deprecated alias `index` | non-entry selector only |
+| `#n` (ordinal) | positional selector, deprecated alias `index` | ordered components other than `entry`, unique selectors only |
+| `^t` (type key) | key selector, shorthand for `[type = "t"]` | typed components, unique selectors only |
 
 All keywords, component names, property names and pseudo-property names of both
 surface syntaxes are **lower-case and case-sensitive**. `id`, not `ID`; `entry`,
@@ -927,7 +1059,7 @@ list; they are then combined by conjunction, each of them being satisfied
 independently:
 
 ```text
-entry[form@tww = "mami", has sense[category = "Verb", has example[text@tww ~ "jefi"]]]
+entry[form@tww = "mami", has sense[has category[value = "Verb"], has example[text@tww ~ "jefi"]]]
 ```
 
 `has` is an existential predicate: it filters the component it is attached to,
@@ -1060,7 +1192,7 @@ written beside another one; that combination is not a syntax error but a
 
 - The ordinal counts **same-type siblings only**: `example#2` is the second `example` child of its parent, whatever other children the parent may have.
 - The ordinal starts at 1.
-- The ordinal can be used with any component type except `entry`.
+- The ordinal can be used on an **ordered** component type (section "3.1") other than `entry`, and on no other. On a typed or a singleton component type it raises `COMPONENT_NOT_ORDERED`, a static error: `note#1` asks for the first of a collection that has no order, and `category#1` for the first of something there is only ever one of. On `entry` it raises the same code, the entry list being ordered by the dictionary and not by this language (section "2").
 - The ordinal is not a property: it cannot be set by any initializer, cannot be the target of `set`, `update` or `clear`, cannot appear in a `create` initializer list, and is forbidden with `upsert` (a component that does not exist yet has no position). It can be used in the command selector of `delete`, `move` and `ensure`, and in a parent selector on the strict axis.
 - The ordinal is forbidden in a filtering selector (`within`, `has`): `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`.
 - If the ordinal is lower than 1, `ILLEGAL_ORDINAL` is raised (static error). If it is greater than the number of same-type siblings, `INDEX_OUT_OF_BOUNDS` is raised (dynamic error).
@@ -1087,6 +1219,64 @@ The previous command raises `INDEX_OUT_OF_BOUNDS` if there are not at least two
 senses under that entry.
 
 In order to change the position of a component, use the `move` command.
+
+#### 5.3.4 Type selectors
+
+A **typed** component (section "3.1") lives in a map keyed by its `type`
+property, and is selected by its key. The *type key* is written as a suffix on
+the step, introduced by `^`, and its value is either an unquoted name — a `name`
+in LiftPatchRef, a bare word in LiftPatchShort (Part 3, section "6.1.1") — or a
+quoted string:
+
+```text
+trait^editor
+note^general
+field^borrowing
+translation^free
+trait^"CV pattern"
+```
+
+`trait^editor` designates the `trait` child whose `type` is `"editor"`, exactly
+as `example#1` designates the first `example` child. The two suffixes are
+parallel devices for the two non-singleton kinds, and each is available on its
+own kind only.
+
+**The type key is a spelling of the natural-identity lookup.** `note^general` and
+`note[type = "general"]` are the same selector and resolve identically; `^t` is
+strategy S6 and the bracketed form is strategy S3 (section "5.1.3"). Nothing
+depends on which is written, and `^t` is RECOMMENDED for its concision and
+because it states, at the point of use, that the component type is a typed one.
+
+- The type key is written **after** the component name and carries the whole selection: because it is a step suffix and not a predicate, it cannot be combined with a predicate list. `note[text@en = "…"]^general` is a syntax error, exactly as `sense[gloss@en = "pig"]#2` is.
+- The value is compared **literally**, as an ordinary string equality on the `type` property. A type containing a space, a slash, a `^` or any other character the unquoted form does not admit is written between quotes. There is no regular-expression or case-insensitive form of `^t`: to match a type loosely, write the predicate out, `note[type ~i "^gen"]`, in a filtering selector.
+- The type key can be used on a **typed** component type and on no other. On an ordered or a singleton component type it raises `COMPONENT_NOT_TYPED`, a static error: `example^free` and `category^noun` name a key where there is none.
+- The type key is not a property: it cannot be set by any initializer, cannot be the target of `set`, `update` or `clear`, and cannot appear in a `create` or `upsert` initializer list. **It selects and never creates**, exactly like the ordinal. To create a typed component, write its `type` as an ordinary initializer: `create note(type = "general", text@en = "…")`. Writing `create note^general(...)` is a syntax error.
+- The type key can be used in the command selector of `delete` and `ensure`, and in a parent selector on the strict axis. It cannot be used on `move`, which no typed component accepts at all (`COMPONENT_NOT_ORDERED`, section "8.5").
+- The type key is forbidden in a filtering selector (`within`, `has`, or a step marked `each` / `all` / `*`): `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`. Write the `type` predicate out there, `within note[type = "general"]`, which is legal and says the same thing (section "5.1.4").
+- If no same-type sibling has that `type`, the ordinary `NOT_FOUND` is raised (section "5.1.5", rule 1). The uniqueness invariant guarantees that no more than one can, so a type key never raises `AMBIGUOUS_REFERENCE`.
+- Type keys are re-evaluated for each command, against the state of the dictionary left by the preceding commands, exactly as ordinals are.
+
+In the following example, the `note` whose type is `"etymology"` is given a new
+text:
+
+```LiftPatchRef
+set text@en = "borrowed from Tok Pisin"
+  on note^etymology
+  of entry[form@tww = "mami", hn = 1]
+```
+
+which is the same command as:
+
+```LiftPatchRef
+set text@en = "borrowed from Tok Pisin"
+  on note[type = "etymology"]
+  of entry[form@tww = "mami", hn = 1]
+```
+
+Since a typed component has no position, there is no `move` and no `at` clause
+for it: to change the key of a typed component, write its `type` with `set`,
+which re-keys it in place and is checked against the uniqueness invariant like
+any other identity assignment (section "5.2").
 
 ### 5.4 Command applicability
 
@@ -1116,6 +1306,7 @@ verdict.
 Reading rules:
 
 - "required" means: the command is rejected with `MISSING_REQUIRED_PROPERTY` (for `create` and `upsert`) or `INCOMPLETE_SELECTOR` (for a selector) if the property is absent.
+- The kind rules of section "3.1" are checked before this table: on a **singleton** step in a unique position the whole selector is refused with `SINGLETON_TAKES_NO_SELECTOR`, whatever the role of the property written in it.
 - "forbidden" in a selector column means that the predicate is rejected with `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`: a unique selector uses exactly one selection strategy (section "5.1.3") and carries no additional predicate, the only admitted supplement being the `has` refinement of strategies S3 and S4 and the `hn` refinement of S4, both of which are part of the strategy rather than additions to it.
 - R3 and R4 are "required" for `upsert` even though the select branch may make them unnecessary: which branch will run is not known statically, and the create branch must be able to satisfy section "6.1" rule 1.
 - The `clear` column implements one invariant: **a property that the metamodel declares required may never become unset**, and an identity property may never become unset. See the decision table in section "9.3.1".
@@ -1135,14 +1326,17 @@ two have opposite verdicts — `set form = … on entry[id = "entry-42"]` is leg
 | `hn` | forbidden | forbidden in the initializer list — `COMMAND_NOT_ALLOWING_HN`; allowed in the parent selector | allowed on `entry` only, together with `form` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
 | `has-gloss` | forbidden — `COMMAND_NOT_ALLOWING_HAS` | select branch only, on `entry`, together with `form`; never applied in the create branch | allowed on `entry` only, together with `form` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
 | `has STEP` | forbidden — `COMMAND_NOT_ALLOWING_HAS` | select branch only, on any component type; never applied in the create branch | allowed, on any component type, as a refinement of strategy S3 or S4 (section "5.1.3") | allowed, including nested | forbidden |
-| ordinal `#n` | forbidden | forbidden | allowed, alone, on every component type except `entry` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
+| ordinal `#n` | forbidden | forbidden | allowed, alone, on an **ordered** component type other than `entry`; elsewhere `COMPONENT_NOT_ORDERED` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
+| type key `^t` | forbidden | forbidden | allowed, alone, on a **typed** component type; elsewhere `COMPONENT_NOT_TYPED` | forbidden — `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | forbidden |
+| singleton step | not applicable: a singleton is never created | not applicable: a singleton is never upserted | required, alone, on a **singleton** component type; anything after the name is `SINGLETON_TAKES_NO_SELECTOR` | not applicable: in a filtering selector a singleton step carries an ordinary predicate list (section "5.1.4") | not applicable |
 | label `$name` | not a predicate; introduced by `as $name` | not a predicate; introduced by `as $name` | allowed, as a whole step, including as the step of an `on` clause | forbidden | forbidden |
 
-Three cells of this table are worth reading twice, because they are the ones that
+Four cells of this table are worth reading twice, because they are the ones that
 are easy to get wrong and each is exercised by the conformance corpus:
 
 - `id` and the ordinal are allowed as the step of an `on` clause: `set form = { tww: "mami" } on entry[id = "entry-42"]` and `set text@tpi = "…" on example#1 within sense[...]` are both legal (cases C-018 and C-031);
-- neither may be *written*: `set id = …`, `update hn = …`, `clear #2` are all forbidden, whatever the component type;
+- so are the type key and the singleton step: `set text@en = "…" on note^general of entry[...]` and `set value = "Noun" on category of sense[...]` are the ordinary way to write on a typed and on a singleton component;
+- none of them may be *written*: `set id = …`, `update hn = …`, `clear #2`, `set ^general = …` are all forbidden, whatever the component type. The `type` property of a typed component, by contrast, **is** an ordinary property and may be written: `set type = "general" on note^etymology` re-keys the note (section "5.3.4");
 - a label is a whole step and never a predicate, so `on $pig` is legal and `[label = $pig]` does not exist.
 
 ### 5.5 Language qualifier rules
@@ -1163,7 +1357,7 @@ An omitted qualifier uses the applicable default language.
 The following should be invalid:
 
 ```text
-set category@en = "noun"
+set value@en = "noun"
 set target@en = "entry-42"
 ```
 
@@ -1239,7 +1433,7 @@ it needs no exception because it addresses no single language implicitly. On a
 scalar property, no qualifier is allowed and none is needed:
 
 ```text
-clear category
+clear value
 ```
 
 Which qualifier is *accepted* is a question of syntax, and is settled here.
@@ -1251,7 +1445,7 @@ decision table of section "9.3.1".
 
 By default every command operates on exactly one component, and any ambiguity is
 an error. This makes a whole class of ordinary editorial operations
-inexpressible — "give every sense of this entry the category Noun", "delete
+inexpressible — "give every sense of this entry the grammatical category Noun", "delete
 every example of this sense". Rather than weakening the default, the language
 lets a script *state* that it intends to operate on several components.
 
@@ -1261,13 +1455,16 @@ command:
 ```LiftPatchRef
 delete all example[...] under sense[gloss@en = "pig"] of entry[form@tww = "mami"]
 
-set category = "Noun"
-  on each sense[...] 
+set value = "Noun"
+  on each category
+  of sense[...]
   of entry[form@tww = "mami"]
 ```
 
 - `all` and `each` are synonyms and have identical semantics. `all` reads better with `delete`, `each` with `set`, `update` and `clear`.
 - A multiplicity keyword is allowed **only** on the target step of `delete`, `set`, `update` and `clear`. It is forbidden on `create`, `upsert`, `ensure` and `move`, and on every parent step, where it raises `MULTIPLICITY_NOT_ALLOWED`.
+- `each` / `all` are available on a **typed** component, whose same-type siblings are several even though they are unordered: `delete all note[type ~ "^draft"]` is legal and ordinary.
+- On a **singleton** target step the keyword is written on the step, as everywhere else, but what it distributes over is the **host**: a host has exactly one such child, so "every category of these senses" can only mean "the category of every one of these senses". A marked singleton step therefore carries no filter of its own — it has nothing to filter — and makes the step naming its host the filtering selector instead. In `set value = "Noun" on each category of sense[...] of entry[...]`, the `sense[...]` step may match several senses, it is subject to the rules of section "5.1.4" rather than those of a parent selector, and the command writes on the category of each sense it matches. The steps above the host are unaffected and keep their own rules. This is the only construct in which the marked step and the filtering step are not the same step, and it exists because a singleton and its host are in one-to-one correspondence.
 - A marked target step is a *filtering selector* (section "5.1.4"): it may carry any predicate, and it is not required to use a selection strategy. The steps above it in the chain are unaffected and keep their own rules.
 - The marked step may match zero, one, or several components. **Matching none is not an error**: the command succeeds and applies to no component, producing no effect. This is the one place in the language where an empty result does not raise `NOT_FOUND` (section "5.1.5", rule 1), and it is deliberate: `all` and `each` say "however many there are", so a cleanup line such as `delete all example[text@tww ~ "^draft"]` must be runnable on a sense that happens to have no draft example, and a script that ends with such a line must be re-runnable. Raising `NOT_FOUND` here would make every `all` / `each` command require the editor to know the answer before asking the question.
 - The exemption covers the marked step **only**. The steps above it keep their ordinary rules, so a missing or ambiguous *parent* still raises `NOT_FOUND` or `AMBIGUOUS_REFERENCE`: in `delete all example[...] under sense[gloss@en = "pig"] of entry[form@tww = "mami"]`, the sense and the entry must each exist and be unambiguous, and only the set of examples may be empty.
@@ -1325,10 +1522,13 @@ create example(
 )
 ```
 
-   This should raise `DUPLICATE_PROPERTY`.
+This should raise `DUPLICATE_PROPERTY`.
+   
 5. `ensure` has **no** initializer list: it is an assertion and takes a selector between square brackets (section "8.3"). Writing `ensure component(...)` is a syntax error.
 6. `upsert` requires all the properties of the natural identity property set of the component type, and applies every other initializer with `set` semantics (section "8.2").
 7. `create` checks the uniqueness invariant (section "5.2") after all initializers are resolved. A component type with an empty natural identity property set — `entry` in the current metamodel — has no invariant to check, and `create` never rejects it as a duplicate.
+8. A **singleton** component type (section "3.1") has no initializer list at all, because it is never created: `create category(...)` and `upsert category(...)` raise `SINGLETON_CANNOT_BE_CREATED_OR_DELETED`, a static error. Its properties are given with `set` once its host exists.
+9. The ordinal `#n` and the type key `^t` are selectors and never initializers: `create note^general(text@en = "…")` is a syntax error, and the `type` of a typed component is written as an ordinary initializer, `create note(type = "general", text@en = "…")` (sections "5.3.3" and "5.3.4").
 
 ### 6.2 The `at` position clause
 
@@ -1349,6 +1549,7 @@ AT-CLAUSE ::= 'at' 'beginning'
 - The `at` clause is available on `create`, on `upsert` (where it applies only if the create branch runs), on an embedded initializer, and on a command written inside a block. It is mandatory on `move` (section "8.5"), which has no default.
 - The `at` clause is forbidden on `ensure`, which creates nothing.
 - The `at` clause is forbidden on a command targeting an `entry` — `create entry(...) at ...` and `upsert entry(...) at ...` are syntax errors. The dictionary, not the script, orders the entry list (section "2"), so there is no position for the clause to designate.
+- The `at` clause is available on **ordered** component types only (section "3.1"). On a **typed** component it raises `COMPONENT_NOT_ORDERED`, a static error — `create note(type = "general", text@en = "…") under entry[...] at beginning` names a position in a map — and on a **singleton** the question does not arise, since a singleton is never created at all.
 
 #### 6.2.1 The step of `at before` / `at after`
 
@@ -1358,7 +1559,7 @@ operates on. But it contains a `STEP`, and that step is resolved like any other
 step, under rules that are stated here rather than in section "5.1" because they
 apply nowhere else:
 
-- The step is resolved **among the same-type siblings under the destination parent**, and nowhere else: it is not a chain, it takes no axis, and it never leaves that sibling list.
+- The step is resolved **among the same-type siblings under the destination parent**, and nowhere else: it is not a chain, it takes no axis, and it never leaves that sibling list. Since the `at` clause is available on ordered component types only, that step always names an ordered component, and its usual strategy is the ordinal.
 - Its component type, when written, must be the type of the component being placed; it may also be omitted in the concise syntax (Part 3, section "5.3"). A different type is a `SYNTAX_ERROR`: no parentage is in question — both components would be legal children of the same parent — and what is wrong is the command, which names a sibling list the component being placed does not belong to.
 - It must resolve to **exactly one** sibling: `NOT_FOUND` if none matches, `AMBIGUOUS_REFERENCE` if several do.
 - Because it must resolve uniquely, it obeys the rules of a *command selector* (section "5.1.3"): one selection strategy, no additional predicate, and none of the filtering-only predicates (`!=`, `~`, `~i`, `exists`, `absent`), which raise `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`. The ordinal strategy is the usual one here: `at after #2`.
@@ -1481,7 +1682,15 @@ And for the three property commands:
 groups of verbs, and the difference matters:
 
 - for `create` and `upsert`, which are written with an **initializer list**, presence is decided by the **natural identity** of the component type (section "5.2"), against the same-type siblings under the resolved parent;
-- for `ensure`, `delete` and `move`, which are written with a **selector**, presence is decided by that selector and by whichever selection strategy it uses (section "5.1.3") — which may be a label, an `id`, an ordinal, or an `hn`-refined form lookup, none of which is a natural identity. `delete sense[id = "s-41"]` finds its component or raises `NOT_FOUND` without consulting any identity key.
+- for `ensure`, `delete` and `move`, which are written with a **selector**, presence is decided by that selector and by whichever selection strategy it uses (section "5.1.3") — which may be a label, an `id`, an ordinal, a type key, or an `hn`-refined form lookup, none of which is a natural identity. `delete sense[id = "s-41"]` finds its component or raises `NOT_FOUND` without consulting any identity key.
+
+The matrix above is written for a non-singleton component type. A **singleton**
+(section "3.1") is outside four of its five rows: `create`, `upsert`, `delete`
+and `move` all raise `SINGLETON_CANNOT_BE_CREATED_OR_DELETED` on one, since it
+neither comes into existence nor leaves it by any command. `ensure category` is
+the one component command a singleton accepts, and it always succeeds and always
+changes nothing, the component being present by construction. The three property
+commands apply to a singleton exactly as to any other component.
 
 Each verb is defined in full in sections "8" and "9".
 
@@ -1497,7 +1706,7 @@ For all eight commands, PARENT refers to the parent component of the targeted pr
 
 The clause is **mandatory** in every other case, and a command that omits it is
 rejected with `MISSING_PARENT_CLAUSE`, a static error: `create sense(gloss@en =
-"pig")` and `set category = "Noun"` name no parent and there is nowhere for them
+"pig")` and `set value = "Noun"` name no parent and there is nowhere for them
 to act. The one place where the clause is omitted is the body of a block, whose
 header supplies the parent (section "11").
 
@@ -1514,7 +1723,7 @@ existential filtering (`within`, section "7.4").
 - Multiple such clauses can be chained together, and the two keywords may alternate freely. Every `of` or `within` selector must be a parent of the previous component.
 - either the component after `on` or `under`, or the component after the last clause of the chain must be an entry
 - skipped ancestors are not allowed
-- a chain that **stops before reaching an `entry`** is rejected with `INCOMPLETE_ANCESTOR_CHAIN`. This is a static error: it depends only on the component types written in the command and on the metamodel, not on the dictionary. `set category = "Noun" on sense[gloss@en = "pig"]`, with no `of` or `within` clause, is therefore rejected before any lookup;
+- a chain that **stops before reaching an `entry`** is rejected with `INCOMPLETE_ANCESTOR_CHAIN`. This is a static error: it depends only on the component types written in the command and on the metamodel, not on the dictionary. `set value = "Noun" on category of sense[gloss@en = "pig"]`, which stops at the sense, is therefore rejected before any lookup;
 - a chain in which two adjacent steps name component types that the metamodel does not relate as parent and child is rejected with `ILLEGAL_PARENT`, the code section "3" gives to every impossible parentage. **Skipping a level is this error, not the previous one**: in `on example[...] of entry[...]` the sense is missing, and what the command actually states is that an `example` is a child of an `entry`, which the hierarchy of section "3" forbids.
 - `of`, `under` and `on` are the three keyword spellings of the same axis, the strict-parent axis, written `!` in Part 3 — or, between a command's parent path and its direct target, written as the whitespace that separates them (Part 3, section "4.1"). Which keyword is used depends only on the position in the command, never on the semantics: `under` before the immediate parent of a component command, `on` before the immediate parent of a property command, `of` before every further ancestor.
 
@@ -1560,12 +1769,13 @@ selectors written on the *parent side* of a `within` — to its right, in this
 syntax — are filtering selectors. So:
 
 ```LiftPatchRef
-set category = "Verb"
+set definition@fr = "Un animal"
   on sense[gloss@en = "pig"]        # legal: strategy S3, may match once per candidate entry
   within entry[form@tww = "mami"]
 
-set category = "Verb"
-  on sense[category = "Noun"]       # PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR
+set definition@fr = "Un animal"
+  on sense[gloss@en = "pig", definition@en = "A four-legged terrestrial animal"]
+                                    # PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR
   within entry[form@tww = "mami"]
 ```
 
@@ -1624,16 +1834,18 @@ of entry[form@tww = "mami"]
 An empty string is a valid property value. It does not mean deletion:
 
 ```LiftPatchRef
-set category = ""
-  on sense[gloss@en = "pig"]
+set value = ""
+  on category
+  of sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
 ```
 
 To remove a property, use `clear`:
 
 ```LiftPatchRef
-clear category
-  on sense[gloss@en = "pig"]
+clear value
+  on category
+  of sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
 ```
 
@@ -1673,10 +1885,10 @@ hierarchy of section "3".
 
 For instance, the following example contains a chain of two within clause 
 - First, entry matching the given form are select. Several entries can be selected, say Entry-A, Entry-B and Entry-C.
-- Then, only the entries having one (*or several*) sense with the given category are kept. If several senses match on a same entry, it creates several candidate-tree:
-  - Lets say that Entry-C has no sense with category="Verb" and is ruled out.
-  - Lets say that Entry-B has one sense with category="Verb" and is then kept. A candidate path Entry-B.Sense-A is kept.
-  - Lets say that Entry-A has two senses with category="Verb". Two candidate paths are kept: Entry-A.Sense-B and Entry-A.Sense-C
+- Then, only the entries having one (*or several*) sense whose `category` carries the given value are kept. If several senses match on a same entry, it creates several candidate-tree:
+  - Lets say that Entry-C has no sense whose category has the value "Verb" and is ruled out.
+  - Lets say that Entry-B has one such sense and is then kept. A candidate path Entry-B.Sense-A is kept.
+  - Lets say that Entry-A has two such senses. Two candidate paths are kept: Entry-A.Sense-B and Entry-A.Sense-C
 - There are now three candidate path 
 - we considere now the left of the last `within`.
   - If one candidate path has an example with the required property, it succeed and this example is the parent of the created field.
@@ -1689,7 +1901,7 @@ create field(
   text@en = "Very important"
 )
 under example[text = "a mami jefi"]
-within sense[category = "Verb"]
+within sense[has category[value = "Verb"]]
 within entry[form@tww = "mami"]
 ```
 
@@ -1772,7 +1984,7 @@ update value = "Animals"
 on annotation[type="semantic domain", value="Animal"]
 of field[type="free"]
 of example[text="a mami jefi"]
-within sense[category="Noun"]
+within sense[has category[value = "Noun"]]
 within entry[form="mami"]
 ```
 
@@ -1786,12 +1998,12 @@ In the previous example:
 
 ```text
 of example[text="a mami jefi"]
-within sense[category="Noun"]
+within sense[has category[value = "Noun"]]
 within entry[form="mami"]
 ```
 
 - the resolver starts with the last `within` clause: it selects all entries matching `entry[form="mami"]`. If no `entry` matches, it raises `NOT_FOUND`. Suppose that four entries have this form.
-- it then moves to the left of that `within` clause, which has a selector containing `sense[category="Noun"]`. It applies this filter to the previously selected entries. Suppose that two of the four entries have a `sense` child with the category "Noun". Two candidate paths remain. Had one entry carried two such senses, that entry would have contributed two candidate paths, not one.
+- it then moves to the left of that `within` clause, which has a selector containing `sense[has category[value = "Noun"]]`. It applies this filter to the previously selected entries. Suppose that two of the four entries have a `sense` child whose category carries the value "Noun". Two candidate paths remain. Had one entry carried two such senses, that entry would have contributed two candidate paths, not one.
 - the step above is repeated with the left of this last `within`, i.e. the selector `example[text="a mami jefi"]`. For each candidate path, we look for an example with the given text under its sense. If exactly one candidate path yields such an example, it is kept. If several candidate paths yield one, an `AMBIGUOUS_REFERENCE` error is raised. If none does, a `NOT_FOUND` error is raised.
 - the group is now resolved to exactly one `example`. **This single component is then handed to the clause at the left of the group, `of field[type="free"]`, which resolves it under the ordinary `of` rule** (section "7.3"): the field is looked up among the children of that one example, it must be selected unambiguously by its own selection strategy, and it raises `NOT_FOUND` or `AMBIGUOUS_REFERENCE` on its own.
 - the same applies in turn to `on annotation[type="semantic domain", value="Animal"]`, resolved among the children of that one `field`. The `update` command is then applied to the `value` property of that one `annotation`.
@@ -1815,7 +2027,7 @@ A `within` clause describes a chain of child-parent with potentially partial inf
 ```LiftPatchRef
 set text@tpi = "mi shutim pik"
 on example#1
-within sense[category = "Noun"]
+within sense[has category[value = "Noun"]]
 within entry[form@tww = "mami"]
 ```
 
@@ -1913,6 +2125,13 @@ upsert sense(
 under entry[form@tww = "mami", hn = 1]
 ```
 
+**`create` and the component kinds.** `create` builds a component of an
+**ordered** or a **typed** type, and nothing else:
+
+- on an ordered type it inserts into the list of same-type siblings, at the position given by the `at` clause or at the end (section "6.2");
+- on a typed type there is no position and no `at` clause (`COMPONENT_NOT_ORDERED`); the component is keyed by its `type`, which is a required initializer, and creating a second one with a `type` a sibling already has is the ordinary `CANNOT_CREATE_DUPLICATE`;
+- on a **singleton** type it raises `SINGLETON_CANNOT_BE_CREATED_OR_DELETED`, a static error. `create category(value = "Noun") under sense[...]` is rejected before any lookup; the sense already has a category, and what the writer means is `set value = "Noun" on category of sense[...]`.
+
 #### 8.1.1 Creating an `entry`
 
 This is not an exception to the rule above but an instance of it. The natural
@@ -1983,12 +2202,12 @@ admitted in an `upsert` parenthesis at all, while they are rejected in a
 `create` parenthesis. The same reasoning applies below the entry: 
 
 ```LiftPatchRef
-upsert sense(gloss@en = "pig", has example[text@tww ~ "jefi"], category = "Noun")
+upsert sense(gloss@en = "pig", has example[text@tww ~ "jefi"], definition@en = "A four-legged terrestrial animal")
   under entry[form@tww = "mami", hn = 1]
 ```
 
 resolves the sense whose gloss is "pig" **and** which already carries an example
-mentioning "jefi", and creates a plain `sense(gloss@en = "pig", category = "Noun")`
+mentioning "jefi", and creates a plain `sense(gloss@en = "pig", definition@en = "…")`
 — with no example, since `D` is never applied — if no such sense exists.
 
 One consequence of that last clause must be understood before using `D` on a
@@ -1997,7 +2216,7 @@ the match but takes no part in the creation, so a `D` that excludes an existing
 sibling with the same identity key sends the command to the create branch, where
 the uniqueness invariant then refuses it:
 
-- under an entry that has a sense glossed "pig" **with** a "jefi" example, the command above takes the select branch and sets `category`;
+- under an entry that has a sense glossed "pig" **with** a "jefi" example, the command above takes the select branch and sets `definition@en`;
 - under an entry that has a sense glossed "pig" **without** such an example, `M` is empty, the create branch runs, and it fails with `CANNOT_CREATE_DUPLICATE`, because two senses under one entry may not share `gloss@en`.
 
 That is the correct outcome — the script asked for a sense that does not exist,
@@ -2013,17 +2232,22 @@ Further rules:
 - The `at` clause, if present, applies only to the create branch; it is ignored by the select branch. It is not available at all when `T` is `entry` (section "6.2").
 - `as $LABEL`, if present, binds the created component in the create branch and the resolved component in the select branch.
 
-In the following example, the `category` property
-  will be either created (if it does not exist) or updated to "Noun" (if it does
+In the following example, the `definition@en` property
+  will be either created (if it does not exist) or replaced (if it does
   exist).
 
 ```
 upsert sense(
   gloss@en = "pig",
-  category = "Noun"
+  definition@en = "A four-legged terrestrial animal"
 )
 under entry[form@tww = "mami"]
 ```
+
+The grammatical category of that sense is **not** written here: `category` is a
+singleton component, not a property of `sense` (section "3.1"), and it is written
+with a property command of its own, `set value = "Noun" on category of
+sense[gloss@en = "pig"] of entry[form@tww = "mami"]`.
 
 #### 8.2.2 `id` is not admitted
 
@@ -2071,7 +2295,8 @@ The ordinary selector errors apply, and nothing else: `NOT_FOUND` when nothing
 matches, `AMBIGUOUS_REFERENCE` when several do, success and no change when
 exactly one does (section "5.1.5"). Two points are specific to `ensure`:
 
-- it accepts every selection strategy, including `id`, `hn`, `has` / `has-gloss` and the ordinal `#n`, and it may target any component type, `entry` included: since it does not create, the empty natural identity property set of `entry` is irrelevant to it. This holds for `hn` too: an `hn` that matches no entry raises `NOT_FOUND` like any other selector that matched nothing (section "5.3.2.1");
+- it accepts every selection strategy, including `id`, `hn`, `has` / `has-gloss`, the ordinal `#n`, the type key `^t` and the bare singleton step, and it may target any component type, `entry` included: since it does not create, the empty natural identity property set of `entry` is irrelevant to it. This holds for `hn` too: an `hn` that matches no entry raises `NOT_FOUND` like any other selector that matched nothing (section "5.3.2.1");
+- it is the **one component command a singleton accepts** (section "3.1"): `ensure category under sense[...]` always succeeds and always changes nothing, the component being present by construction. The assertion is not useless — it still requires the *parent chain* to resolve to exactly one sense — but it says nothing about the singleton itself;
 - it takes no `at` clause;
 - it **binds a label** (`as $NAME`, section "6.3") when one is written. `ensure` resolves exactly one component, so the label is well defined, and asserting a precondition and naming its subject in the same line is the command's most useful form:
 
@@ -2130,7 +2355,29 @@ nothing (section "5.6"), so the line above is safe to run on a sense that has no
 draft example. The parent clauses are unaffected: the sense and the entry must
 still exist and be unambiguous.
 
+A **singleton** component cannot be deleted: `delete category under sense[...]`
+raises `SINGLETON_CANNOT_BE_CREATED_OR_DELETED`, a static error. It disappears
+only with its host, and deleting the host deletes it as a descendant like any
+other child. To empty it rather than remove it, clear its properties:
+`clear value on category of sense[...]`.
+
 ### 8.5 The `move` command
+
+**`move` applies to ordered components only.** Moving is a change of position,
+and only an ordered component type (section "3.1") has positions:
+
+```text
+move ORDERED-COMPONENT under PARENT [ under DESTINATION-PARENT ] at POSITION
+```
+
+A `move` whose target step names a **typed** component type raises
+`COMPONENT_NOT_ORDERED`, a static error: `move note[type = "general"] …` asks to
+reorder a map. A typed component is re-keyed by writing its `type` with `set`
+(section "5.3.4"), and is re-parented by deleting it and creating it under the
+new parent, which is a different operation with different effects and is written
+out as such. A `move` whose target step names a **singleton** raises
+`SINGLETON_CANNOT_BE_CREATED_OR_DELETED`; `move entry[...]` remains the syntax
+error of section "2".
 
 The `at POSITION` clause of section "6.2" is **mandatory** on `move`: a move with
 no stated destination position would have no defined meaning, and `move` is the
@@ -2178,6 +2425,7 @@ move example#1
 
 A move fails with a structured error if:
 
+- the moved component type is not an ordered one: `COMPONENT_NOT_ORDERED` for a typed one and `SINGLETON_CANNOT_BE_CREATED_OR_DELETED` for a singleton, both static
 - moving to the current position raises `MOVING_TO_CURRENT_POSITION`
 - the destination cannot contain the source component type: `ILLEGAL_PARENT`, the same code as for any other illegal parentage (section "3")
 - the move would make a component its own ancestor (`SELF_ANCESTOR`);
@@ -2207,8 +2455,17 @@ Moving changes position and parentage, never identity.
 absent and replaces its value if present:
 
 ```LiftPatchRef
-set category = "Noun"
+set definition@en = "A four-legged terrestrial animal"
   on sense[gloss@en = "pig"]
+  of entry[form@tww = "mami"]
+```
+
+Or, writing on a singleton component (section "3.1"):
+
+```LiftPatchRef
+set value = "Noun"
+  on category
+  of sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
 ```
 
@@ -2250,8 +2507,9 @@ When `set` targets a natural identity property, the uniqueness invariant of sect
 "5.6"), and a multi-language literal as its value (section "5.5.1"):
 
 ```LiftPatchRef
-set category = "Noun"
-  on each sense[category != "Verb"]
+set value = "Noun"
+  on each category
+  of sense[gloss@en != "pig"]
   of entry[form@tww = "mami"]
 ```
 
@@ -2275,8 +2533,7 @@ clear PROPERTY { ',' PROPERTY } on [each] PARENT
 ```
 
 ```LiftPatchRef
-set category = "Noun",
-    definition@en = "A four-legged terrestrial animal",
+set definition@en = "A four-legged terrestrial animal",
     definition@fr = "Un animal terrestre à quatre pattes"
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
@@ -2296,7 +2553,7 @@ The same holds for `clear`, whose list is a list of property names rather than
 of assignments:
 
 ```LiftPatchRef
-clear category, definition@*
+clear definition@en, definition@fr
   on sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
 ```
@@ -2369,8 +2626,9 @@ defaulted — are those of section "5.5.3". On a scalar property, `clear` remove
 the value and takes no qualifier:
 
 ```LiftPatchRef
-clear category
-  on sense[gloss@en = "pig"]
+clear value
+  on category
+  of sense[gloss@en = "pig"]
   of entry[form@tww = "mami"]
 ```
 
@@ -2420,7 +2678,7 @@ The three cases a lexicographer meets most often, each naming the row of section
 |---|---|---|
 | `clear url on illustration[...]` | `Illustration.url`: scalar, required, identity (R1) | `CANNOT_CLEAR_IDENTITY_PROPERTY` |
 | `clear value on trait[...]` | `Trait.value`: scalar, required, non-identity (R3) | `CANNOT_CLEAR_REQUIRED_PROPERTY` |
-| `clear category on sense[...]` | `Sense.category`: scalar, optional (R5) | the value is removed, or `UNSET_PROPERTY` if it was already unset |
+| `clear value on category of sense[...]` | `Category.value`: scalar, optional (R5) | the value is removed, or `UNSET_PROPERTY` if it was already unset |
 
 And the same for a required multitext, `Entry.form` (R4), where the outcome
 depends on what remains:
@@ -2561,7 +2819,7 @@ The next example has a block header that contains a component with selector. It 
 entry[form@tww = "mami"] {
   create sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
-    set category = "Noun"
+    set value = "Noun" on category
 
     create example(text@tww = "a mami jefi") {
       create translation(
@@ -2605,13 +2863,13 @@ In the next example, the outer block header is a `upsert` command:
 upsert entry(form@tww = "mami", has-gloss="pig") {
   upsert sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
-    set category = "Noun"
+    set value = "Noun" on category
     create example(text@tww = "a mami jefi") 
   }
 }
 ```
 
-The preceding command is very useful if the user want to create a new entry only if none of the existing entry with "form=mami" has the gloss given in "has-gloss". In other word, if an entry exist with that sense, we do nothing (appart updating definition and category), but if the sense does not exist, we do not want to create it on any of the existing entry having form="mami": we want to create it on a new entry.
+The preceding command is very useful if the user want to create a new entry only if none of the existing entry with "form=mami" has the gloss given in "has-gloss". In other word, if an entry exist with that sense, we do nothing (appart updating the definition and the category), but if the sense does not exist, we do not want to create it on any of the existing entry having form="mami": we want to create it on a new entry.
 
 This semantic of two embedded upsert cannot be expressed without the block syntax.
 
@@ -2623,7 +2881,7 @@ on an entry the same command has just created makes no sense.
 create entry(form@tww = "mami") {
   upsert sense(gloss@en = "pig") {
     set definition@en = "A four-legged terrestrial animal"
-    set category = "Noun"
+    set value = "Noun" on category
     create example(text@tww = "a mami jefi") 
   }
 }
@@ -2815,7 +3073,7 @@ Normative points about the plan document:
 - **A `delete` reports exactly one `componentDeleted`**, for the component the command names, and **none for its descendants**, even though deleting a component deletes its descendants (section "8.4"). It reports no `propertyRemoved` for the properties of the deleted components either. The effect list describes what the *script* did, not the transitive closure of what disappeared: a plan that listed one line per descendant would bury a one-line command under fifty effects, and the descendants are recoverable from the dictionary, which the reader has. The same holds for a `move`: one `componentMoved`, never one per descendant.
 - A `create` reports one `componentCreated` followed by one `propertySet` per qualified value written by its initializers, in the order in which the initializers are written.
 - `language` is `null` for a scalar property, and is the language code for a qualified value. A `clear p@*` yields one `propertyRemoved` effect per language actually removed, in the dictionary's language-list order.
-- `position`, `fromPosition` and `toPosition` are 1-based and count same-type siblings. On `componentCreated`, `position` is the position the component would occupy once created; on `componentDeleted`, it is the position the component occupies **before** the command runs, so that a `delete all` reports the positions of the original list rather than of the list as it shrinks. On `componentMoved`, `fromPosition` is read before the command runs and `toPosition` after. All three are `null` for an `entry`, whose list the language does not order (section "2").
+- `position`, `fromPosition` and `toPosition` are 1-based and count same-type siblings. On `componentCreated`, `position` is the position the component would occupy once created; on `componentDeleted`, it is the position the component occupies **before** the command runs, so that a `delete all` reports the positions of the original list rather than of the list as it shrinks. On `componentMoved`, `fromPosition` is read before the command runs and `toPosition` after. All three are `null` wherever there is no position to report: for an `entry`, whose list the language does not order (section "2"), and for a **typed** or a **singleton** component, which live in no ordered list at all (section "3.1"). `componentMoved` never carries a typed or a singleton component, since neither can be moved.
 - `path` is a human-readable path from the root using the reference syntax; it is **informative**, and two implementations may differ in it. So are the `fromParent` and `toParent` objects of a `componentMoved` effect, which contain one. Which fields of an `effect` are compared is stated once, in Appendix D.1; `id`, `componentType`, `error.code` and `summary` are compared as well.
 - A command marked `each` or `all` carries `applications` instead of `effects`, one element per affected component, in the execution order of section "5.6".
 - Plan mode never writes to the dictionary, and it MUST be available for both surface syntaxes.
@@ -2894,10 +3152,10 @@ whitespace, it matches one of the following:
 
 1. `COMMAND-LETTER`, optionally followed by the multiplicity marker `*`, followed by one or more whitespace characters, followed by a second token that begins with:
    - `/` — a path (`c /mami`, `d /e[f="mami"] s[g="pig"]`), or
-   - `$` — a label (`s $pig (c = "Noun")`), or
+   - `$` — a label (`s $pig (d@en = "A pig")`), or
    - a component letter (or component name) immediately followed by `(` — a constructor with no parent path, which only `c` and `p` accept (`c e("mami")`, `p entry(f="mami", has-gloss="pig")`), or
-   - `(` — the parenthesis of a property command with no path, which is admitted **only on an indented line**, where the parent is supplied by the enclosing indented block (`s (c = "Noun")`, section "3.3"), or
-   - a component letter (or component name) immediately followed by `[` or `#` — a *relative path*, or the bare target step of a `d` or an `e`, also admitted **only on an indented line**, whose first step is a child of the enclosing indented block's component (`d x#1`, `d s[g="pig"] x#1`, section "3.3").
+   - `(` — the parenthesis of a property command with no path, which is admitted **only on an indented line**, where the parent is supplied by the enclosing indented block (`s (d@en = "A pig")`, section "3.3"), or
+   - a component letter (or component name) immediately followed by `[`, `#` or `^` — a *relative path*, or the bare target step of a `d` or an `e`, also admitted **only on an indented line**, whose first step is a child of the enclosing indented block's component (`d x#1`, `d n^draft`, `d s[g="pig"] x#1`, section "3.3").
 2. `language-default ` or `language-create ` followed by `object` or `meta`:
 
 ```
@@ -2956,7 +3214,7 @@ lexicographer write about pigs in a file that also creates them:
 ```LiftPatchShort
 > c /mami
 >   c s("pig")
->     s (c = "Noun")
+>     s (d@en = "A pig")
 ```
 
 **Comments.** A `#` preceded by whitespace, or beginning a line, starts a
@@ -3001,9 +3259,10 @@ In concise syntax, commands, components, and properties are designated by a sing
 Some commands, components, and properties are abbreviated by the same letter (for instance, `e` = the `ensure` command and the `entry` component). However, the same letter is never used for two commands, for two properties, or for two components. Position alone decides which namespace a letter belongs to, and the rule is normative:
 
 1. The first token of a command line is a **command** letter, optionally followed by `*`.
-2. A letter immediately followed by `[`, `#`, or `(` and appearing either inside a path (after `/` or `!`), or in direct-target position — the target step of a `d`, an `e` or the source of an `m` (section "4.1") — or as the head of an initializer, is a **component** letter.
-3. A letter appearing inside square brackets or inside a parenthesized list, and followed by (optional whitespace) `=`, `@`, `,` or `)`, is a **property** letter. All four terminators matter, the comma included: in the `clear` list `l /mami/pig (c, d@*)`, the property `c` (`category`) is followed by a comma and by nothing else.
+2. A letter immediately followed by `[`, `#`, `^` or `(` and appearing either inside a path (after `/` or `!`), or in direct-target position — the target step of a `d`, an `e` or the source of an `m` (section "4.1") — or as the head of an initializer, is a **component** letter.
+3. A letter appearing inside square brackets or inside a parenthesized list, and followed by (optional whitespace) `=`, `@`, `,` or `)`, is a **property** letter. All four terminators matter, the comma included: in the `clear` list `l /mami/pig/a[y="edit", v="todo"] (w, h)`, the property `w` (`when`) is followed by a comma and by nothing else, and in `l /mami/pig/c (v)` the property `v` (`value`) is followed only by the closing parenthesis.
 4. A letter followed by `(` inside an initializer list is a **component** letter opening an embedded initializer (section "7"); the same letter followed by `=`, possibly after whitespace, is a property letter. One token of look-ahead therefore suffices.
+5. A token that is exactly the code or the full name of a **singleton** component type (Part 1, section "3.1"), that stands where a path step is expected, and whose type the metamodel admits as a child of the component the preceding step resolved, is a **component** token naming that singleton. This is the one component step followed by nothing, and the rule is decidable because the set of singleton types and the parentage table are both fixed by the metamodel. Where the rule does not apply — no singleton of that name is admissible at that point — the token is an abbreviated step, that is a bare word (section "6.1"). A quoted token is **always** an abbreviated step: write `/mami/pig/"c"` for an example whose text is `"c"`, and `/mami/pig/c` for the category of that sense.
 
 **Full names as aliases.** Anywhere a one-letter component code or property code
 is expected, the full reference-syntax name may be written instead: `entry` for
@@ -3017,10 +3276,15 @@ c /e[f="mami"] s(g="pig")
 
 This keeps the one-letter codes for the frequent components and properties
 without forcing a lexicographer to remember that `o` is a translation and `l` a
-reversal. A component name — one letter or full — is recognized as such only
-when it is immediately followed by `[`, `#` or `(`; a path step written
-`/entry`, with nothing after it, is the bare entry form `"entry"`, exactly as
-`/e` is the bare entry form `"e"` (section "6.1").
+reversal. A component name — one letter or full — is recognized as such when it
+is immediately followed by `[`, `#`, `^` or `(`; a path step written `/entry`,
+with nothing after it, is the bare entry form `"entry"`, exactly as `/e` is the
+bare entry form `"e"` (section "6.1").
+
+**The one exception is a singleton.** A singleton component (Part 1, section
+"3.1") is written with its name alone, so it is the one component step that is
+followed by nothing. Rule 5 below settles it, and section "6.1" states the
+consequence for abbreviated steps.
 
 ### 2.1 Command codes
 
@@ -3048,7 +3312,7 @@ letter:
 
 ```LiftPatchShort
 d* /e[f="mami"]/s[g="pig"] x[t~"^draft"]
-s* /e[f="mami"]/s[g="pig"] (c = "Noun")
+s* /e[f="mami"]/s[g="pig"] (d@en = "A pig")
 ```
 
 - `*` is allowed only on `d`, `s`, `u` and `l`, that is on `delete`, `set`, `update` and `clear`. On `c`, `p`, `m` and `e` it raises `MULTIPLICITY_NOT_ALLOWED`. The grammar of Appendix C.2 admits `*` after every command letter precisely so that this check can report that code: a marker on the wrong verb is a mistake about the language, and telling the writer "multiplicity is not allowed here" is more useful than telling them the line does not parse.
@@ -3075,6 +3339,7 @@ The components are the same as in the LIFT-DSL language. They are referred to by
 | Note | `n` |
 | Field | `f` |
 | Translation | `o` |
+| Category | `c` |
 
 ### 2.3 Property codes
 
@@ -3086,7 +3351,6 @@ The properties on components are the same as in LIFT-DSL language, they are refe
 | `morpheme` | m |
 | `definition` | d |
 | `gloss` | g |
-| `category` | c |
 | `text` | t |
 | `source` | s |
 | `target` | a |
@@ -3260,7 +3524,7 @@ e [<parent-path>] <target-step> [as $<label>]
 e /e[f="mami"] s[g="pig"]
 e /mami pig
 e /mami pig as $pig
-s $pig (c = "Noun")
+s $pig (d@en = "A pig")
 ```
 
 `ensure` may target any component type, `entry` included; on an `entry` the
@@ -3290,7 +3554,7 @@ l <path> (<property> {, <property>})
 
 On an **indented** line the path of a property command may be omitted, and the
 command then applies to the component of the enclosing indented block (section
-"3.1"): `s (c = "Noun")`. Outside an indented block the path is mandatory, and a
+"3.1"): `s (d@en = "A pig")`. Outside an indented block the path is mandatory, and a
 property command written without one — like a component command other than an
 `entry` written without a parent — is rejected with `MISSING_PARENT_CLAUSE`, a
 static error.
@@ -3301,8 +3565,8 @@ resolved once, the assignments are applied in the order written, and the command
 is atomic.
 
 ```LiftPatchShort
-s /mami/pig (c = "Noun", d@en = "A four-legged terrestrial animal")
-l /mami/pig (c, d@*)
+s /mami/pig (d@en = "A four-legged terrestrial animal", d@fr = "Un animal terrestre")
+l /mami/pig (d@en, d@fr)
 ```
 
 Three rules of the reference syntax apply unchanged to the parenthesized part:
@@ -3357,7 +3621,7 @@ repeats the path on every line:
 ```LiftPatchShort
 c /mami
 c /mami/pig
-s /mami/pig (c = "Noun")
+s /mami/pig/c (v = "Noun")
 c /mami/pig x("a mami jefi")
 c /mami/pig/"a mami jefi" o("free", "I shot a pig")
 ```
@@ -3370,7 +3634,7 @@ transaction boundary:
 ```LiftPatchShort
 c /mami
   c s("pig")
-    s (c = "Noun")
+    s (d@en = "A four-legged terrestrial animal")
     c x("a mami jefi")
       c o("free", "I shot a pig")
   c n("general", "recorded at Yakoro, 2025")
@@ -3401,7 +3665,7 @@ forms become available, and they are the forms the recognition rule of section
 | Form | Written | Means |
 |---|---|---|
 | no path | `c s("pig")` | create under the block's component |
-| no path | `s (c = "Noun")` | set on the block's component |
+| no path | `s (d@en = "A pig")` | set on the block's component |
 | target only | `d x#1` | a target step that is a **child** of the block's component |
 | relative path + target | `d s[g="pig"] x#1` | a parent path whose first step is a **child** of the block's component, and the target below it |
 
@@ -3429,7 +3693,7 @@ The block above is exactly:
 ```LiftPatchRef
 create entry(form@tww = "mami") {
   create sense(gloss@en = "pig") {
-    set category = "Noun"
+    set definition@en = "A four-legged terrestrial animal"
     create example(text@tww = "a mami jefi") {
       create translation(type = "free", text@en = "I shot a pig")
     }
@@ -3474,7 +3738,7 @@ Three properties of a parent path govern everything in this section, and the
 first is the one most easily got wrong when passing between the two syntaxes:
 
 - **A path reads from the ancestor down to the descendant**, left to right: `/e[f="mami"]/s[g="pig"]` is the entry first and its sense second. A LiftPatchRef chain reads the other way, from the component up to its ancestors: `sense[gloss@en="pig"] within entry[form@tww="mami"]` is the same chain written backwards (Part 1, section "5.1.1"). Wherever this section says "the step that follows", it means the step to the **right**, that is the **child**.
-- **A path starts at the root.** Its first step is an `entry` — written `e[…]`, `e#n` is not available since entries have no ordinal, or an abbreviated bare form (section "6.1") — or a label bound earlier in the document, which stands for whatever component it was bound to. A path whose first step is anything else is rejected with `INCOMPLETE_ANCESTOR_CHAIN`, a static error: `s /s[g="pig"] (c = "Noun")` names no entry. A path that **skips a level** of the hierarchy of Part 1, section "3", is a different error: `d /e[f="mami"] x[t="…"]` states that an `example` is a child of an `entry`, and is rejected with `ILLEGAL_PARENT`.
+- **A path starts at the root.** Its first step is an `entry` — written `e[…]`, `e#n` is not available since entries have no ordinal, or an abbreviated bare form (section "6.1") — or a label bound earlier in the document, which stands for whatever component it was bound to. A path whose first step is anything else is rejected with `INCOMPLETE_ANCESTOR_CHAIN`, a static error: `s /s[g="pig"] (d@en = "A pig")` names no entry. A path that **skips a level** of the hierarchy of Part 1, section "3", is a different error: `d /e[f="mami"] x[t="…"]` states that an `example` is a child of an `entry`, and is rejected with `ILLEGAL_PARENT`.
 - **Inside an indented block, a path may instead be relative** (section "3.3"): written without the leading `/`, its first step is a child of the block's component. The rule above then applies from that component rather than from the root. A `d` or an `e` inside a block may also carry no parent path at all, its target step then being a child of the block's component.
 
 ### 4.1 The axis of a link
@@ -3508,7 +3772,7 @@ target is:
 | Command | Direct target |
 |---|---|
 | `c`, `p` | the constructor, `s(g="pig")` |
-| `s`, `u`, `l` | the parenthesized property list, `(c = "Noun")` |
+| `s`, `u`, `l` | the parenthesized property list, `(d@en = "A pig")` |
 | `d`, `e`, source of `m` | a single **target step**, written after the path |
 
 `m`'s destination is an ordinary parent path and is introduced by the keyword
@@ -3561,7 +3825,7 @@ So:
 - in `d /e[f="mami"] s[g="pig"]`, the target is the sense; the link sense–entry is the unwritten strict one, so both selectors are unique;
 - in `d /e[f="mami"]/s[g="pig"] x[t="…"]`, the target is the example; the link example–sense is the unwritten strict one, and the written link sense–entry is existential, so the entry is a filtering step;
 - in `d /e[f="mami"]!s[g="pig"] x[t="…"]`, the same delete with the sense–entry link made strict: the entry is now a unique selector too, and must resolve to exactly one entry;
-- in `s /e[f="mami"]/s[g="pig"] (c="Noun")`, the target is the `category` property; the strict link joins it to the sense, and the written link sense–entry is existential.
+- in `s /e[f="mami"]/s[g="pig"] (d@en="A pig")`, the target is the `definition` property; the strict link joins it to the sense, and the written link sense–entry is existential.
 
 The **path-only forms** of `c` and `p` — `c /mami/pig`, `p /mami/pig/"a mami
 jefi"` — carry no separated target, because sections "3" and "8" define them by
@@ -3642,6 +3906,29 @@ delete example#1
 - The ordinal counts same-type siblings only and starts at 1.
 - As in the reference syntax, an ordinal cannot occur together with any predicate in the same step: `x[1]` and `x#1` carry the ordinal and nothing else, and `x[g="pig"]#1` is a syntax error.
 - The `#n` form is RECOMMENDED, since it is the form used by the reference syntax; the `[n]` form is kept for concision.
+- The ordinal is available on **ordered** component types only (Part 1, section "3.1"); on a typed or a singleton one it raises `COMPONENT_NOT_ORDERED`. There is no `[n]` alias for the type key of section "4.2.1".
+
+#### 4.2.1 Type keys and singleton steps
+
+The other two selection devices of Part 1, section "3.1", are written in the
+concise syntax exactly as in the reference syntax, and are the concise way to
+reach a typed or a singleton component:
+
+| Component kind | Step | Means |
+|---|---|---|
+| ordered | `x#1` | the first `example` child (section "4.2") |
+| typed | `n^general` | the `note` child whose `type` is `"general"` (Part 1, section "5.3.4") |
+| singleton | `c` | the `category` child, of which there is exactly one (Part 1, strategy S7) |
+
+```LiftPatchShort
+u /e[f="mami"]/s[g="pig"]/n^general (t@en = "recorded at Yakoro")
+s /mami/pig/c (v = "Noun")
+d /e[f="mami"] n^draft
+```
+
+- The **type key** `^t` takes a bare word (section "6.1.1") or a quoted string: `n^general` and `n^"field note"` are both steps. It cannot occur together with a predicate list in the same step — `n[t@en="…"]^general` is a syntax error — and it is available on **typed** component types only, raising `COMPONENT_NOT_TYPED` elsewhere. Like the ordinal, it selects and never creates, so it may not appear on a constructor: `c /mami n^general(t@en = "…")` is a syntax error, and the `type` is written as an ordinary initializer, `c /mami n(y="general", t@en = "…")`.
+- The **singleton step** is the component code or name alone, with nothing after it. It is the one path step with no suffix and no brackets, and rule 5 of section "2" is what tells it apart from an abbreviated step: `/mami/pig/c` is the category of the sense "pig", while `/mami/pig/"c"` is the example whose text is `"c"`. A singleton step carrying a selector in a unique position — `/mami/pig/c[v="Noun"]` as the parent path of a command — raises `SINGLETON_TAKES_NO_SELECTOR`; inside a `has` predicate or on the parent side of a `/` link the same spelling is a filtering step and is legal: `d /e[f="mami", has s[has c[v="Verb"]]] s[g="pig"]`.
+- A singleton is never created, never deleted and never moved, so `c /mami/pig c(v="Noun")`, `d /mami/pig c` and any `m` naming one raise `SINGLETON_CANNOT_BE_CREATED_OR_DELETED`. Write the property command instead: `s /mami/pig/c (v = "Noun")`.
 
 ### 4.3 Predicates in a step
 
@@ -3658,11 +3945,12 @@ letter, since letters are reserved for component and property names:
 | `[t ~ "^draft"]` | `[text ~ "^draft"]` | filtering steps only |
 | `[t ~i "^draft"]` | `[text ~i "^draft"]` | filtering steps only |
 | `[exists(d@fr)]` | `[exists(definition@fr)]` | filtering steps only |
-| `[absent(c)]` | `[absent(category)]` | filtering steps only |
+| `[absent(v)]` | `[absent(value)]` | filtering steps only |
 | `[has s[g = "pig"]]` | `[has sense[gloss = "pig"]]` | any step, subject to Part 1, section "5.3.2" |
 | `[has-gloss = "pig"]` | `[has-gloss = "pig"]` | see Part 1, section "5.3.2.2" |
 | `[id = "entry-42"]` | `[id = "entry-42"]` | see Part 1, section "5.3.1" |
 | `[hn = 1]` | `[hn = 1]` | see Part 1, section "5.3.2.1" |
+| `^general` | `^general` | typed components, unique selectors only; see Part 1, section "5.3.4" |
 
 Which steps are *unique selectors* and which are *filtering steps* is rule R3 of
 section "4.1", restated here in full. It is decided by the axis of each link, and
@@ -3672,7 +3960,7 @@ never by counting steps:
 - the **last step of a parent path** is a unique selector: the link joining it to the direct target is the strict axis, written as whitespace;
 - a step whose **child** link is written `!` is a unique selector;
 - **every other step** — that is, every step on the parent side of a `/` link — is a filtering step;
-- the direct-target step becomes a **filtering step** when the command carries the multiplicity marker `*`, which is exactly what the marker says;
+- the direct-target step becomes a **filtering step** when the command carries the multiplicity marker `*`, which is exactly what the marker says. On a **singleton** target step the marker instead makes the step naming its host the filtering one, as in the reference syntax (Part 1, section "5.6"): `s* /e[f="mami"]/s[g!="pig"]/c (v = "Noun")` writes on the category of every matching sense;
 - any step inside a `has` predicate is a filtering step, at any depth;
 - a path used as a **reference value** (section "3.2") has no separated target, so the same rules apply to it with its own last step in the direct-target position.
 
@@ -3680,7 +3968,7 @@ Every step that is not a filtering step must select exactly one component, and a
 predicate restricted to filtering steps that appears there — typically on the
 immediate parent of the target — raises
 `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`, exactly as in the reference syntax.
-Conversely a pseudo-property — `id`, `hn`, `has-gloss`, an ordinal — may appear
+Conversely a pseudo-property — `id`, `hn`, `has-gloss`, an ordinal, a type key — may appear
 only on a unique selector, which is why `!` is what makes
 `/e[f="mami", hn=1]!s[g="pig"]` legal where `/e[f="mami", hn=1]/s[g="pig"]` is
 `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER`.
@@ -3820,10 +4108,10 @@ move example#1
 ```
 
 The five positions of the reference syntax (Part 1, sections "6.2" and "6.2.1")
-are all available, with exactly the same semantics. `STEP` is an ordinary
-concise step — a component letter (or component name) with a predicate or an
-ordinal — and it must select exactly one same-type sibling of the destination
-parent:
+are all available, with exactly the same semantics. Since `m` moves an **ordered**
+component and nothing else (Part 1, section "8.5"), `STEP` is an ordered step — a
+component letter (or component name) with a predicate or an ordinal — and it must
+select exactly one same-type sibling of the destination parent:
 
 ```LiftPatchShort
 m /e[f="mami"]/s[g="pig"] x#3 at after x[t="a mami jefi"]
@@ -3848,14 +4136,15 @@ mandatory on `m` and has no default.
 ### 5.4 Set
 
 ```LiftPatchShort
-s /e[f="mami"]/s[g="pig"] (c = "Noun")
+s /e[f="mami"]/s[g="pig"]/c (v = "Noun")
 ```
 
 Is equivalent to:
 
 ```LiftPatchRef
-set category = "Noun" 
-  on sense[gloss="pig"]
+set value = "Noun" 
+  on category
+  of sense[gloss="pig"]
   within entry[form="mami"]
 ```
 
@@ -3882,14 +4171,15 @@ The wildcard `@*` is forbidden on `s`, as it is on `set` (Part 2, section
 ### 5.5 Update
 
 ```LiftPatchShort
-u /e[f="mami"]/s[g="pig"] (c = "Verb")
+u /e[f="mami"]/s[g="pig"]/c (v = "Verb")
 ```
 
 is equivalent to
 
 ```LiftPatchRef
-update category = "Verb" 
-  on sense[gloss="pig"]
+update value = "Verb" 
+  on category
+  of sense[gloss="pig"]
   within entry[form="mami"]
 ```
 
@@ -3902,14 +4192,15 @@ rewrite several languages in one command.
 ### 5.6 Clear
 
 ```LiftPatchShort
-l /e[f="mami"]/s[g="pig"] (c)
+l /e[f="mami"]/s[g="pig"]/c (v)
 ```
 
 is equivalent to
 
 ```LiftPatchRef
-clear category
-  on sense[gloss="pig"]
+clear value
+  on category
+  of sense[gloss="pig"]
   within entry[form="mami"]
 ```
 
@@ -4050,13 +4341,14 @@ list of depths is exhaustive:**
 
 - The depth is counted from the root **across the parent path and the direct target together** (section "4.1"), and nothing else decides it: the target step of `d /mami/pig "a mami jefi"` is at depth 3 and is the abbreviated example, exactly as the last step of the parent path of `c /mami/pig/"a mami jefi" o("free", "…")` is. A target step that is not separated from the path — there is none, since a target is exactly one step — never changes the count, and neither does the shape of the earlier steps: `/e[f="mami"]/pig` is a legal path whose second step is the abbreviated sense, and `/mami/s[g="pig"]/"a mami jefi"` is legal too.
 - A bare or quoted step at depth 4 or deeper raises `ABBREVIATED_STEP_NOT_ALLOWED_HERE`, a static error, so `d /mami/pig/"a mami jefi" foo` is rejected: its target step is at depth 4. There is no abbreviation below the example, because below it the component type is no longer determined by the depth: a sense may hold an example, a note, a field, an illustration and more.
+- A bare token that is exactly the code or the name of a **singleton** component type admissible at that point is a singleton step and never an abbreviated step (section "2", rule 5). At depth 3 under a sense this is the only collision the language has, and quoting resolves it: `/mami/pig/c` is the category of that sense, `/mami/pig/"c"` the example whose text is `"c"`. A quoted token is always an abbreviated step.
 - Abbreviated steps are available only where the depth from the root is written down, that is in a path opened by the root marker `/` whose first step is at depth 1, and in the target step that follows such a path. In a **relative** path inside an indented block (section "3.3"), in a bare target step inside one, and in a path that begins with a **label**, the depth from the root is not written down, so every step must name its component type; a bare or quoted step there raises the same error.
 
 #### 6.1.1 The bare word
 
-The abbreviated steps of the three preceding rules are the only place where a
-value may be written without quotes. What may be written there is a *bare word*,
-defined positively:
+The abbreviated steps of the three preceding rules, and the value of a type key
+`^t` (section "4.2.1"), are the only two places where a value may be written
+without quotes. What may be written there is a *bare word*, defined positively:
 
 ```text
 BARE-WORD ::= BARE-CHAR { BARE-CHAR }
@@ -4069,7 +4361,7 @@ Everything that is not a `BARE-CHAR` must be quoted. This includes, and is not
 limited to, whitespace and the characters:
 
 ```text
-/  \  "  '  $  (  )  [  ]  {  }  @  ,  :  =  #  *  !  ~
+/  \  "  '  $  (  )  [  ]  {  }  @  ,  :  =  #  ^  *  !  ~
 ```
 
 The class is defined by what it admits, not by what it forbids, for two reasons:
@@ -4185,6 +4477,7 @@ argument beyond the number given for its type, raises
 | Relation | — | — |
 | Variant | — | — |
 | Reversal | — | — |
+| Category | — | — — a singleton is never created (Part 1, section "3.1") |
 
 The mapping is the required properties of the type, in a fixed order, which is
 what makes it memorable. That order is **normative and is declared explicitly**,
@@ -4442,7 +4735,7 @@ the same shape with additional entries, under three conditions:
 
 1. It MUST NOT remove or redefine anything this appendix declares: an extension adds component types, adds properties to existing component types, and adds children to existing component types. Changing the datatype, the `required` flag or the `naturalIdentity` of anything declared here produces a different language, not an extension of this one.
 2. The extended document MUST carry `"extends": "1.0"` and its own identifier in `"metamodelId"`, and a script MAY require it with a pragma attribute: `%liftpatch 1.0 metamodel="tww-project-2"`. If the required metamodel is not the one loaded, the script is rejected with `UNSUPPORTED_METAMODEL`.
-3. Every rule of this specification is stated in terms of the metamodel, never in terms of the particular types listed below — with the single exception of `entry`, whose special status (no parent, empty natural identity, dictionary-ordered list, `hn` and `has-gloss`) is part of the language. An extension therefore needs no change to Parts 1 to 3.
+3. Every rule of this specification is stated in terms of the metamodel, never in terms of the particular types listed below — with the single exception of `entry`, whose special status (no parent, empty natural identity, dictionary-ordered list, `hn` and `has-gloss`) is part of the language. An extension therefore needs no change to Parts 1 to 3. An added component type MUST declare a `componentKind`, and MUST satisfy the two invariants stated in the reading rules below; an extension may not change the `componentKind` of a type declared here.
 
 ```json
 {
@@ -4452,6 +4745,7 @@ the same shape with additional entries, under three conditions:
   "root": "dictionary",
   "components": {
     "entry": {
+      "componentKind": "ordered",
       "children": ["sense", "etymology", "variant", "relation", "pronunciation",
                    "reversal", "trait", "annotation", "note", "field"],
       "naturalIdentity": [],
@@ -4462,17 +4756,18 @@ the same shape with additional entries, under three conditions:
       }
     },
     "sense": {
+      "componentKind": "ordered",
       "children": ["sense", "example", "relation", "illustration", "reversal",
-                   "trait", "annotation", "note", "field"],
+                   "trait", "annotation", "note", "field", "category"],
       "naturalIdentity": ["gloss"],
       "unnamedArguments": ["gloss"],
       "properties": {
         "gloss":      { "datatype": "multitext", "qualifier": "meta", "required": true },
-        "definition": { "datatype": "multitext", "qualifier": "meta", "required": false },
-        "category":   { "datatype": "string",    "qualifier": null,   "required": false }
+        "definition": { "datatype": "multitext", "qualifier": "meta", "required": false }
       }
     },
     "example": {
+      "componentKind": "ordered",
       "children": ["translation", "trait", "annotation", "field"],
       "naturalIdentity": ["text"],
       "unnamedArguments": ["text"],
@@ -4481,6 +4776,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "etymology": {
+      "componentKind": "ordered",
       "children": ["trait", "annotation", "field"],
       "naturalIdentity": ["type", "form"],
       "unnamedArguments": ["type", "form"],
@@ -4492,6 +4788,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "variant": {
+      "componentKind": "ordered",
       "children": ["pronunciation", "relation", "trait", "annotation", "field"],
       "naturalIdentity": ["type", "target"],
       "unnamedArguments": [],
@@ -4501,6 +4798,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "relation": {
+      "componentKind": "ordered",
       "children": ["trait", "annotation", "field"],
       "naturalIdentity": ["type", "target"],
       "unnamedArguments": [],
@@ -4510,6 +4808,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "reversal": {
+      "componentKind": "ordered",
       "children": ["trait", "annotation", "field"],
       "naturalIdentity": ["type", "target"],
       "unnamedArguments": [],
@@ -4520,6 +4819,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "illustration": {
+      "componentKind": "ordered",
       "children": ["annotation", "field"],
       "naturalIdentity": ["url"],
       "unnamedArguments": ["url"],
@@ -4529,6 +4829,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "media": {
+      "componentKind": "ordered",
       "children": ["annotation", "field"],
       "naturalIdentity": ["url"],
       "unnamedArguments": ["url"],
@@ -4538,6 +4839,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "pronunciation": {
+      "componentKind": "ordered",
       "children": ["media", "trait", "annotation", "field"],
       "naturalIdentity": ["transcription"],
       "unnamedArguments": ["transcription"],
@@ -4546,6 +4848,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "trait": {
+      "componentKind": "typed",
       "children": ["annotation", "field"],
       "naturalIdentity": ["type"],
       "unnamedArguments": ["type", "value"],
@@ -4555,6 +4858,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "annotation": {
+      "componentKind": "ordered",
       "children": [],
       "naturalIdentity": ["type", "value"],
       "unnamedArguments": ["type", "value"],
@@ -4567,6 +4871,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "note": {
+      "componentKind": "typed",
       "children": ["annotation"],
       "naturalIdentity": ["type"],
       "unnamedArguments": ["type", "text"],
@@ -4576,6 +4881,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "field": {
+      "componentKind": "typed",
       "children": ["annotation"],
       "naturalIdentity": ["type"],
       "unnamedArguments": ["type", "text"],
@@ -4585,6 +4891,7 @@ the same shape with additional entries, under three conditions:
       }
     },
     "translation": {
+      "componentKind": "typed",
       "children": [],
       "naturalIdentity": ["type"],
       "unnamedArguments": ["type", "text"],
@@ -4592,12 +4899,23 @@ the same shape with additional entries, under three conditions:
         "type": { "datatype": "string",    "qualifier": null,   "required": true },
         "text": { "datatype": "multitext", "qualifier": "meta", "required": true }
       }
+    },
+    "category": {
+      "componentKind": "singleton",
+      "children": ["trait"],
+      "naturalIdentity": [],
+      "unnamedArguments": [],
+      "properties": {
+        "value": { "datatype": "string", "qualifier": null, "required": false }
+      }
     }
   },
   "pseudoProperties": {
     "id":        { "kind": "identifier",     "datatype": "string",  "scope": "entry and sense only" },
     "hn":        { "kind": "lookupKey",      "datatype": "integer", "scope": "entry only" },
-    "ordinal":   { "kind": "position",       "datatype": "integer", "scope": "every component type except entry" },
+    "ordinal":   { "kind": "position",       "datatype": "integer", "scope": "ordered component types except entry" },
+    "typeKey":   { "kind": "key",            "datatype": "string",  "scope": "typed component types",
+                   "expandsTo": "[type = V]" },
     "has":       { "kind": "childPredicate", "argument": "step",    "scope": "every component type" },
     "has-gloss": { "kind": "childPredicate", "argument": "string", "qualifier": "meta",
                    "scope": "entry only", "expandsTo": "has sense[gloss@L = V]" }
@@ -4608,11 +4926,12 @@ the same shape with additional entries, under three conditions:
 Reading rules:
 
 - `children` is the parentage relation of section "3": a component may be created or moved only under a component type that lists it in its `children`. Only `entry` may be a child of the root `dictionary`. The parent relation is the inverse of this one and is not stated separately, so that the two can never diverge.
+- `componentKind` is the component kind of section "3.1", one of `"ordered"`, `"typed"` and `"singleton"`. It is the single declaration from which every rule about position, ordinals, type keys, the `at` clause and `move` is derived, and an implementation dispatches on it rather than on the component name. Two invariants tie it to the rest of the document and MUST hold of any metamodel, this one and any extension of it: a `"typed"` component type has `"naturalIdentity": ["type"]` and no other identity property, since the map key *is* the identity; and a `"singleton"` component type has an empty `naturalIdentity` and no `required` property, since it is never created and there is never a second one to distinguish it from.
 - `qualifier` gives the language kind of a multitext (`"object"` or `"meta"`) and is `null` for every scalar property. A property with a non-null `qualifier` is exactly a property that accepts an `@L` key and the `@*` wildcard.
 - `required` is *required at creation*: for a multitext, at least one qualified value.
 - `naturalIdentity` is the natural identity property set `I(T)` of section "5.2". An empty set — `entry` — means that the uniqueness invariant is vacuous for that type and that `create` never rejects it as a duplicate. When a multitext belongs to the set, values are compared language by language, and unset qualified values never take part in the comparison.
-- `unnamedArguments` is the ordered list of properties that the unnamed initializer arguments of LiftPatchShort map to, position by position (Part 3, section "6.2.4"). It is declared explicitly, and is **not** derived from the order in which `properties` happens to be written: the order of the keys of a JSON object is not significant, so a derived rule would make the meaning of `c /mami f("editorial", "To be checked")` depend on a parser's hash table. An empty list means the component type admits no unnamed argument, and any unnamed argument given to it raises `UNNAMED_ARGUMENT_NOT_ALLOWED`; so does an argument beyond the length of the list. Every property listed here is a required property of its type.
-- `pseudoProperties` do not belong to the data: they are selection devices, and their availability per command is given by the applicability tables of section "5.4". `kind` says what sort of device each one is — `identifier` (a persistent id), `lookupKey` (a dictionary-assigned disambiguator), `position` (an ordinal), `childPredicate` (a condition on the children of the component) — and is what an implementation dispatches on, rather than on the name. A `childPredicate` is not a datatype-bearing property: `argument` gives what it is written with, a step for `has` and a string for `has-gloss`, and `expandsTo` gives the equivalent general form of the shorthand.
+- `unnamedArguments` is the ordered list of properties that the unnamed initializer arguments of LiftPatchShort map to, position by position (Part 3, section "6.2.4"). It is necessarily empty on a singleton component type, which has no initializer list at all because it is never created. It is declared explicitly, and is **not** derived from the order in which `properties` happens to be written: the order of the keys of a JSON object is not significant, so a derived rule would make the meaning of `c /mami f("editorial", "To be checked")` depend on a parser's hash table. An empty list means the component type admits no unnamed argument, and any unnamed argument given to it raises `UNNAMED_ARGUMENT_NOT_ALLOWED`; so does an argument beyond the length of the list. Every property listed here is a required property of its type.
+- `pseudoProperties` do not belong to the data: they are selection devices, and their availability per command is given by the applicability tables of section "5.4". `kind` says what sort of device each one is — `identifier` (a persistent id), `lookupKey` (a dictionary-assigned disambiguator), `position` (an ordinal), `key` (a type key, section "5.3.4"), `childPredicate` (a condition on the children of the component) — and is what an implementation dispatches on, rather than on the name. The singleton step of strategy S7 is not listed among the pseudo-properties because it is not one: it is the *absence* of a selector, and it is declared by the `componentKind` of the component type instead. A `childPredicate` is not a datatype-bearing property: `argument` gives what it is written with, a step for `has` and a string for `has-gloss`, and `expandsTo` gives the equivalent general form of the shorthand.
 - An extended metamodel (see "Extensibility" above) may add an `unnamedArguments` list to a component type it introduces, and may not change the one of a component type declared here.
 
 ## Appendix B. Error codes
@@ -4646,7 +4965,7 @@ listed in B.4.
 | `INCOMPLETE_SELECTOR` | a selector required to select exactly one component uses no valid selection strategy | 5.1.3 |
 | `MISSING_REQUIRED_PROPERTY` | a `create` or `upsert` initializer list omits a property that Appendix A declares required | 6.1 |
 | `MISSING_IDENTITY_PROPERTY` | an `upsert` initializer list does not cover the whole natural identity property set of the component type | 8.2 |
-| `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR` | a unique selector carries a predicate that is not part of its selection strategy: either a filtering-only operator (`!=`, `~`, `~i`, `exists()`, `absent()`), or an otherwise legal predicate added to a complete strategy, as in `sense[gloss@en = "pig", category = "Noun"]`. The `has` refinement of strategies S3 and S4 and the `hn` refinement of S4 are part of the strategy and are not additions | 5.1.2, 5.1.3, 5.4.1 |
+| `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR` | a unique selector carries a predicate that is not part of its selection strategy: either a filtering-only operator (`!=`, `~`, `~i`, `exists()`, `absent()`), or an otherwise legal predicate added to a complete strategy, as in `sense[gloss@en = "pig", definition@en = "…"]`. The `has` refinement of strategies S3 and S4 and the `hn` refinement of S4 are part of the strategy and are not additions | 5.1.2, 5.1.3, 5.4.1 |
 | `PSEUDO_PROPERTY_NOT_ALLOWED_IN_FILTER` | `id`, `hn`, `has-gloss` or an ordinal is used in a filtering selector — the parent side of `within` / `/`, a step inside `has`, or a step marked `each` / `all` / `*` | 5.1.4, 5.3 |
 | `COMMAND_NOT_ALLOWING_HN` | `hn` is used with a command that does not allow it, in particular in an `upsert` initializer list | 5.3.2.1 |
 | `COMMAND_NOT_ALLOWING_HAS` | `has` or `has-gloss` is used with a command that does not allow it, `create` in particular | 5.3.2.2 |
@@ -4659,11 +4978,15 @@ listed in B.4.
 | `INCOMPLETE_ANCESTOR_CHAIN` | a chain or a path stops before reaching the root: `on sense[...]` with no further ancestor clause, `/s[g="pig"]`. A chain that skips a level is `ILLEGAL_PARENT` instead | 7.3, Part 3, 4 |
 | `MISSING_PARENT_CLAUSE` | a command gives no parent where one is required: a component command whose target is not an `entry` written with no `under` clause, or a property command written with no `on` clause, outside a block; in LiftPatchShort, the same commands written with no path outside an indented block, which includes a `d` or an `e` whose target step is not an `entry` or a label and which carries no parent path, as in an indented `d x#1` or `d s[g="pig"] x#1` that no enclosing block anchors | 7.2, 11, Part 3, 3, 3.1 |
 | `CONSTRUCTOR_REQUIRED` | a `c` or `p` command is written with a path and no constructor, and a step it would have to create is not an abbreviated step: `c /e[f="mami"]/s[g="pig"]` | Part 3, 3, 8 |
+| `SINGLETON_CANNOT_BE_CREATED_OR_DELETED` | a `create`, `upsert`, `delete` or `move` names a **singleton** component type, which always exists on its host and is never brought into being or removed by a command: `create category(...)`, `delete category under sense[...]` | 3.1, 6.1, 8.1, 8.4, 8.5 |
+| `SINGLETON_TAKES_NO_SELECTOR` | a **singleton** step is given a selector, an ordinal or a type key where it is a unique selector: `category[value = "Noun"]` in an `on` or `under` clause. In a *filtering* selector a predicate list is legal there and this code is not raised (5.1.4) | 3.1, 5.1.3 |
+| `COMPONENT_NOT_ORDERED` | an ordinal, an `at POSITION` clause or a `move` names a component type whose kind is not **ordered**: `note#1`, `create note(...) at beginning`, `move field[type = "x"]`. `entry` raises it for the ordinal too, its list being ordered by the dictionary | 2, 3.1, 5.3.3, 6.2, 8.5 |
+| `COMPONENT_NOT_TYPED` | a type key `^t` names a component type whose kind is not **typed**: `example^free`, `category^noun` | 3.1, 5.3.4 |
 | `TARGET_MUST_BE_A_SINGLE_STEP` | the direct target of a `d`, an `e` or the source of an `m` is written as two or more steps, as in `d /mami/pig`, instead of a parent path followed by one target step | Part 3, 3.1, 4.1 |
 | `ABBREVIATED_STEP_NOT_ALLOWED_HERE` | a bare word or a quoted string is written as a step at a depth from the root for which no abbreviation is defined: at depth 4 or deeper, counted across the parent path and the direct target together, or at any depth in a relative path, in a bare target step inside a block, or in a path beginning with a label, where the depth from the root is not written down | Part 3, 6.1 |
 | `OPERATOR_NOT_APPLICABLE_TO_DATATYPE` | an operator is used on a datatype that does not admit it, such as `~` or `~i` on a `reference` or an `integer` property | 5.1.2 |
 | `INVALID_TARGET` | the component designated as the value of a `reference` property is neither an `entry` nor a `sense`. Static, because the component type is written in the chain or is known from the label's binding | 10 |
-| `MULTIPLICITY_NOT_ALLOWED` | `each` / `all` (or `*` in LiftPatchShort) is used on a parent step, on `create`, `upsert`, `ensure` or `move`, or on a command used as the anchor of an indented block | 5.6, Part 3, 3.3 |
+| `MULTIPLICITY_NOT_ALLOWED` | `each` / `all` (or `*` in LiftPatchShort) is used on a parent step, on `create`, `upsert`, `ensure` or `move`, or on a command used as the anchor of an indented block. A **singleton** target step is the one exception to "parent step": there the keyword is legal and distributes over the host (section "5.6") | 5.6, Part 3, 3.3 |
 | `DUPLICATE_LABEL` | a label name visible in the current scope is bound again | 6.3 |
 | `UNKNOWN_LABEL` | a `$name` is used that no visible command has bound | 6.3 |
 | `REFERENCE_VALUE_MUST_BE_A_CHAIN` | a bare string is assigned to, or compared with, a property of datatype `reference`, in a command or in a selector | 10 |
@@ -4677,7 +5000,7 @@ listed in B.4.
 Syntax errors are static too, and are reported with their position. They include
 in particular:
 
-- in both syntaxes: an `ensure` with an initializer list instead of a selector; an `at` clause on `ensure` or on a command creating an `entry`; an `at before` / `at after` step whose component type is not the type being placed (section "6.2.1"); a step combining an ordinal with a predicate; an unterminated string, a raw line break inside a string, or a backslash followed by anything other than `"` or `\` in a double-quoted string (section "1.2");
+- in both syntaxes: an `ensure` with an initializer list instead of a selector; an `at` clause on `ensure` or on a command creating an `entry`; an `at before` / `at after` step whose component type is not the type being placed (section "6.2.1"); a step combining an ordinal or a type key with a predicate list; an ordinal or a type key written on a constructor, as in `create note^general(...)`; an unterminated string, a raw line break inside a string, or a backslash followed by anything other than `"` or `\` in a double-quoted string (section "1.2");
 - in LiftPatchRef: `move entry[...]`; a `move` without an `at` clause;
 - in LiftPatchShort: a command spread over several physical lines; `m /mami`, which would move an entry; a tab character in the indentation of a command line, and an indentation that matches no open block level (Part 3, section "3.3").
 
@@ -4787,7 +5110,7 @@ create-cmd        ::= 'create' constructor [ 'under' chain ] [ at-clause ] [ lab
 upsert-cmd        ::= 'upsert' constructor [ 'under' chain ] [ at-clause ] [ label-binding ]
 ensure-cmd        ::= 'ensure' step [ 'under' chain ] [ label-binding ]
 delete-cmd        ::= 'delete' [ multiplicity ] step [ 'under' chain ]
-move-cmd          ::= 'move' step 'under' chain [ 'under' chain ] at-clause
+move-cmd          ::= 'move' ordered-step 'under' chain [ 'under' chain ] at-clause
 
 set-cmd           ::= 'set' assignment { ',' assignment } [ 'on' [ multiplicity ] chain ]
 update-cmd        ::= 'update' assignment { ',' assignment } [ 'on' [ multiplicity ] chain ]
@@ -4805,9 +5128,12 @@ label-ref         ::= '$' name
 
 chain             ::= step { axis-keyword step }
 axis-keyword      ::= 'of' | 'within'
-step              ::= component-type ( '[' selector ']' | ordinal )
-                    | label-ref
+step              ::= ordered-step | typed-step | singleton-step | label-ref
+ordered-step      ::= component-type ( '[' selector ']' | ordinal )
+typed-step        ::= component-type ( '[' selector ']' | type-key )
+singleton-step    ::= component-type [ '[' selector ']' ]
 ordinal           ::= '#' integer
+type-key          ::= '^' ( name | string )
 
 selector          ::= predicate { ',' predicate }
 predicate         ::= property-ref comparison value
@@ -4827,8 +5153,8 @@ multitext-literal ::= '{' lang ':' string { ',' lang ':' string } '}'
 component-type    ::= 'entry' | 'sense' | 'example' | 'etymology' | 'variant'
                     | 'relation' | 'illustration' | 'media' | 'pronunciation'
                     | 'reversal' | 'trait' | 'annotation' | 'note' | 'field'
-                    | 'translation'
-property-name     ::= 'form' | 'morpheme' | 'gloss' | 'definition' | 'category'
+                    | 'translation' | 'category'
+property-name     ::= 'form' | 'morpheme' | 'gloss' | 'definition'
                     | 'text' | 'source' | 'target' | 'url' | 'label'
                     | 'transcription' | 'type' | 'value' | 'comment'
                     | 'when' | 'who'
@@ -4837,7 +5163,11 @@ property-name     ::= 'form' | 'morpheme' | 'gloss' | 'definition' | 'category'
 Notes on the productions that carry a rule of their own:
 
 - `index '=' integer` inside a selector is the deprecated alias of the ordinal `#n` (section "5.3.3"); it is kept for compatibility and SHOULD NOT be used in new scripts.
-- Every `step` carries either a selector between square brackets or an ordinal, or else is a label: a component type written alone selects nothing and is not a step. A component type followed by parentheses is a `constructor`, not a step, and it creates instead of selecting (section "6").
+- The three step productions are **not** alternatives a parser chooses between: which one applies is fixed by the `componentKind` the metamodel declares for the `component-type` written (section "3.1"), and a parser that does not load the metamodel parses the union of the three and defers the decision to static validation. Writing an `ordinal` on a type that is not ordered is `COMPONENT_NOT_ORDERED`, a `type-key` on a type that is not typed is `COMPONENT_NOT_TYPED`, and a selector on a singleton *in a unique-selector position* is `SINGLETON_TAKES_NO_SELECTOR`.
+- `singleton-step` is the one step that may be written as a bare component type: a singleton has exactly one instance per host, so the type names the component (strategy S7, section "5.1.3"). Its optional selector is admitted by the grammar because a singleton step in a **filtering** position may carry an ordinary predicate list (section "5.1.4"); in every other position that selector is a static error.
+- Every other `step` carries either a selector between square brackets, an ordinal or a type key, or else is a label: a non-singleton component type written alone selects nothing and is not a step. A component type followed by parentheses is a `constructor`, not a step, and it creates instead of selecting (section "6").
+- `ordinal` and `type-key` are selection devices and never initializers, so neither may appear on a `constructor`: `create note^general(...)` is a syntax error (sections "5.3.3" and "5.3.4").
+- `move-cmd` takes an `ordered-step`, because only an ordered component has a position to change (section "8.5"). The grammar cannot tell the kinds apart for the reason given above, so an implementation parses `step` there and reports `COMPONENT_NOT_ORDERED` or `SINGLETON_CANNOT_BE_CREATED_OR_DELETED` as a static error.
 - The `on` keyword closes a value chain (section "10"), which is why `on` cannot be a component name.
 - `move` takes one `under` chain for the source parent and an optional second one for the destination parent; `at-clause` is mandatory. `move` is absent from `block-command`: it cannot appear in a block body (`MOVE_NOT_ALLOWED_IN_BLOCK`, section "11").
 - The optional `'under'` / `'on'` clauses are omitted only inside a block, whose header supplies the parent (section "11"). The grammar makes them optional everywhere because it does not know whether it is inside a block; a command other than one targeting an `entry` that omits its parent clause at top level is rejected with `MISSING_PARENT_CLAUSE`, a static error.
@@ -4866,8 +5196,9 @@ create-cmd        ::= 'c' [ '*' ] ( [ path ] constructor [ at-clause ] [ label-b
 upsert-cmd        ::= 'p' [ '*' ] ( [ path ] constructor [ at-clause ] [ label-binding ] | path )
 ensure-cmd        ::= 'e' [ '*' ] target-spec [ label-binding ]
 delete-cmd        ::= 'd' [ '*' ] target-spec
-move-cmd          ::= 'm' [ '*' ] target-spec [ 'to' path ] at-clause
+move-cmd          ::= 'm' [ '*' ] ordered-target-spec [ 'to' path ] at-clause
 target-spec       ::= [ path spaces ] [ '/' ] path-step
+ordered-target-spec ::= [ path spaces ] ordered-step
 set-cmd           ::= 's' [ '*' ] [ path ] '(' assignment { ',' assignment } ')'
 update-cmd        ::= 'u' [ '*' ] [ path ] '(' assignment { ',' assignment } ')'
 clear-cmd         ::= 'l' [ '*' ] [ path ] '(' property-ref { ',' property-ref } ')'
@@ -4885,14 +5216,18 @@ absolute-path     ::= '/' path-step { axis path-step }
                     | label-ref { axis path-step }
 relative-path     ::= path-step { axis path-step }
 axis              ::= '/' | '!'
-path-step         ::= component-code ( '[' selector ']' | ordinal | '[' integer ']' )
+path-step         ::= ordered-step | typed-step | singleton-step
                     | abbreviated-step
                     | label-ref
+ordered-step      ::= component-code ( '[' selector ']' | ordinal | '[' integer ']' )
+typed-step        ::= component-code ( '[' selector ']' | type-key )
+singleton-step    ::= component-code [ '[' selector ']' ]
 abbreviated-step  ::= ( bare-word | string ) [ '@' lang ]
 bare-word         ::= bare-char { bare-char }
 bare-char         ::= unicode-letter | unicode-mark | unicode-digit
                     | '_' | '-' | '.'
 ordinal           ::= '#' integer
+type-key          ::= '^' ( bare-word | string )
 
 at-clause         ::= 'at' position
 position          ::= 'beginning' | 'end' | 'index' integer
@@ -4902,8 +5237,8 @@ label-ref         ::= '$' name
 
 property-ref      ::= property-code [ '@' ( lang | '*' ) ]
 component-code    ::= 'e' | 's' | 'x' | 'y' | 'v' | 'r' | 'i' | 'm' | 'p' | 'l'
-                    | 't' | 'a' | 'n' | 'f' | 'o' | component-type
-property-code     ::= 'f' | 'm' | 'd' | 'g' | 'c' | 't' | 's' | 'a' | 'u' | 'l'
+                    | 't' | 'a' | 'n' | 'f' | 'o' | 'c' | component-type
+property-code     ::= 'f' | 'm' | 'd' | 'g' | 't' | 's' | 'a' | 'u' | 'l'
                     | 'r' | 'y' | 'v' | 'o' | 'w' | 'h' | property-name
 ```
 
@@ -4911,14 +5246,15 @@ property-code     ::= 'f' | 'm' | 'd' | 'g' | 'c' | 't' | 's' | 'a' | 'u' | 'l'
 of C.1, `hn` included. `component-code` and `property-code` accept the one-letter
 code and the full reference name alike (Part 3, section "2").
 
-Three productions are ambiguous on their own and are disambiguated by the rules of
+Four productions are ambiguous on their own and are disambiguated by the rules of
 Part 3, sections "1.1", "2" and "4.1", which a parser MUST apply:
 
 - `target-spec`: the `[ path spaces ]` and the final `path-step` are separated by whitespace, and the **last top-level whitespace-separated path token** of the command, before any `to`, `at` or `as` clause, is the `path-step`; everything before it is the `path` (Part 3, section "4.1"). Top-level means outside every bracket, parenthesis, brace and quoted string, so whitespace inside a selector never splits a token. The optional `'/'` before that `path-step` is the root marker, and may be written only when no `path` precedes it.
-- `command-line` versus `prose-line`: a line is a command only if it satisfies the recognition rule of section "1.1" — command letter, optional `*`, whitespace, then a token beginning with `/`, with `$`, with a component code immediately followed by `(`, or — on an indented line only — with `(` or with a component code immediately followed by `[` or `#`. When a sigil is declared, a line is a command **if and only if** it begins, after optional whitespace, with that sigil; the `[ sigil ]` of the `command-line` production is optional only because one production covers both modes. A line that matches the rule but does not parse is an error, never prose.
-- `component-code` versus `abbreviated-step` and `property-code` versus a value: one character of look-ahead decides. A letter followed by `[`, `#` or `(` is a component code; a letter followed by `=`, `@`, `,` or `)` is a property code; anything else in a path step is a bare word, that is an abbreviated step (Part 3, section "6.1").
+- `command-line` versus `prose-line`: a line is a command only if it satisfies the recognition rule of section "1.1" — command letter, optional `*`, whitespace, then a token beginning with `/`, with `$`, with a component code immediately followed by `(`, or — on an indented line only — with `(` or with a component code immediately followed by `[`, `#` or `^`. When a sigil is declared, a line is a command **if and only if** it begins, after optional whitespace, with that sigil; the `[ sigil ]` of the `command-line` production is optional only because one production covers both modes. A line that matches the rule but does not parse is an error, never prose.
+- `component-code` versus `abbreviated-step` and `property-code` versus a value: one character of look-ahead decides. A letter followed by `[`, `#`, `^` or `(` is a component code; a letter followed by `=`, `@`, `,` or `)` is a property code; anything else in a path step is a bare word, that is an abbreviated step (Part 3, section "6.1").
+- `singleton-step` versus `abbreviated-step`: a bare token followed by none of those characters is a `singleton-step` when it is exactly the code or the name of a **singleton** component type that the metamodel admits as a child at that point of the path, and an `abbreviated-step` otherwise; a **quoted** token is always an `abbreviated-step` (Part 3, section "2", rule 5). `/mami/pig/c` is therefore the category of that sense and `/mami/pig/"c"` the example whose text is `"c"`.
 
-Eight further constraints are not expressed by the grammar and are static errors:
+Eleven further constraints are not expressed by the grammar and are static errors:
 
 - `indent` is the whitespace between the sigil — or the start of the line, when no sigil is declared — and the command letter. It is significant (Part 3, section "3.3"), and it MUST be made of spaces: a tab there is a `SYNTAX_ERROR`, as is an indentation matching no open block level.
 - `[ path ]` is omitted, and `relative-path` is used, only on an **indented** line, whose enclosing block supplies the parent. At top level both raise `MISSING_PARENT_CLAUSE`.
@@ -4927,6 +5263,9 @@ Eight further constraints are not expressed by the grammar and are static errors
 - `[ '*' ]` is admitted on all eight commands so that a marker on `c`, `p`, `e` or `m` can be reported as `MULTIPLICITY_NOT_ALLOWED` rather than as a parse failure, and so that `*` on the anchor of an indented block can be reported the same way.
 - the path-only alternative of `create-cmd` and `upsert-cmd` requires every step it creates to be an `abbreviated-step`; otherwise `CONSTRUCTOR_REQUIRED`.
 - an `abbreviated-step` is admitted by the grammar anywhere, and is legal only at depth 1, 2 or 3 below the root, counted across the `path` and the target `path-step` of a `target-spec` together, and only when the path is an `absolute-path` that does not begin with a label; elsewhere `ABBREVIATED_STEP_NOT_ALLOWED_HERE`.
+- the three step productions are not alternatives a parser chooses between: which applies is fixed by the `componentKind` the metamodel declares for the `component-code` written (Part 1, section "3.1"). An `ordinal` on a type that is not ordered raises `COMPONENT_NOT_ORDERED`, a `type-key` on a type that is not typed raises `COMPONENT_NOT_TYPED`, and a `singleton-step` given a selector anywhere but in a filtering position raises `SINGLETON_TAKES_NO_SELECTOR`.
+- the source of a `move-cmd` is an `ordered-step`; a `move` naming a typed component raises `COMPONENT_NOT_ORDERED` and one naming a singleton raises `SINGLETON_CANNOT_BE_CREATED_OR_DELETED`. A `c`, a `p` or a `d` naming a singleton raises the latter code too.
+- `ordinal` and `type-key` never appear on a `constructor`: `c /mami n^general(t@en = "…")` is a `SYNTAX_ERROR`, and the `type` of a typed component is written as an ordinary initializer.
 - at most one `pragma-line` may appear in a document, and it must precede the first `command-line`; a pragma declaring a `sigil` must be the first non-blank line (section "1.1").
 
 ## Appendix D. The conformance corpus
@@ -5004,14 +5343,14 @@ sense with two examples, and an inbound reference.
           "id": "s-1",
           "gloss": { "en": "pig", "fr": "cochon" },
           "definition": { "en": "A four-legged terrestrial animal" },
-          "category": "Noun",
+          "category": { "value": "Noun" },
           "examples": [
             { "text": { "tww": "a mami jefi" },
               "translations": [ { "type": "free", "text": { "en": "I shot a pig" } } ] },
             { "text": { "tww": "a mami jefo" } }
           ]
         },
-        { "id": "s-2", "gloss": { "en": "pork" }, "category": "Noun" }
+        { "id": "s-2", "gloss": { "en": "pork" }, "category": { "value": "Noun" } }
       ]
     },
     {
@@ -5035,6 +5374,12 @@ sense with two examples, and an inbound reference.
 Note that `hn` values are given so that cases are reproducible; they remain
 dictionary-assigned (section "5.3.2.1"), and a case MUST NOT assume any `hn`
 that the fixture does not state.
+
+Two shapes of the fixture follow from the component kinds of section "3.1" and
+are normative:
+
+- a **singleton** child is written as an object rather than as a list, because there is exactly one: `"category": { "value": "Noun" }`. A sense for which the fixture states no `category` still **has** one — `s-3`, `s-4` and `s-5` each have a category whose `value` is unset — since a singleton always exists on its host. Writing `"category": {}` and omitting the key are therefore the same fixture;
+- a **typed** child list is keyed by `type`, and no two entries of one such list may share a `type`; the order in which a fixture happens to write them is not significant and an implementation MUST NOT depend on it.
 
 ### D.3 The core cases
 
@@ -5069,14 +5414,14 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-004", "section": "7.3", "syntax": "LiftPatchRef",
     "description": "a within chain resolves through an ambiguous ancestor",
     "dictionary": "standard",
-    "script": "set category = \"Verb\"\n  on sense[gloss@en = \"taro\"]\n  within entry[form@tww = \"mami\"]",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"taro\"]\n  within entry[form@tww = \"mami\"]",
     "expect": { "status": "ok", "effects": [
-      { "kind": "propertySet", "property": "category", "language": null, "oldValue": null, "newValue": "Verb" } ] } },
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "Verb" } ] } },
 
   { "id": "C-005", "section": "7.3", "syntax": "LiftPatchRef",
     "description": "a within chain that leaves two candidate paths fails",
     "dictionary": "standard",
-    "script": "set category = \"Verb\"\n  on sense[gloss@en = \"pig\"]\n  within entry[form@tww = \"mami\"]",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"pig\"]\n  within entry[form@tww = \"mami\"]",
     "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 } },
 
   { "id": "C-006", "section": "5.2", "syntax": "LiftPatchRef",
@@ -5121,18 +5466,18 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-012", "section": "8.2.1", "syntax": "LiftPatchRef",
     "description": "upsert select branch: the sense exists, only the assignment part applies",
     "dictionary": "standard",
-    "script": "upsert sense(gloss@en = \"taro\", category = \"Noun\") under entry[form@tww = \"mami\", hn = 2]",
+    "script": "upsert sense(gloss@en = \"taro\", definition@en = \"An edible root\") under entry[form@tww = \"mami\", hn = 2]",
     "expect": { "status": "ok", "effects": [
-      { "kind": "propertySet", "property": "category", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+      { "kind": "propertySet", "property": "definition", "language": "en", "oldValue": null, "newValue": "An edible root" } ] } },
 
   { "id": "C-013", "section": "8.2.1", "syntax": "LiftPatchRef",
     "description": "upsert create branch: the sense does not exist",
     "dictionary": "standard",
-    "script": "upsert sense(gloss@en = \"yam\", category = \"Noun\") under entry[form@tww = \"mami\", hn = 2]",
+    "script": "upsert sense(gloss@en = \"yam\", definition@en = \"An edible root\") under entry[form@tww = \"mami\", hn = 2]",
     "expect": { "status": "ok", "effects": [
       { "kind": "componentCreated", "componentType": "sense", "position": 3 },
       { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "yam" },
-      { "kind": "propertySet", "property": "category", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+      { "kind": "propertySet", "property": "definition", "language": "en", "oldValue": null, "newValue": "An edible root" } ] } },
 
   { "id": "C-014", "section": "8.2.3", "syntax": "LiftPatchRef",
     "description": "upsert on an entry needs a disambiguation predicate",
@@ -5182,9 +5527,9 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-021", "section": "9.1.1", "syntax": "LiftPatchRef",
     "description": "an assignment list is the sequence of its assignments, applied to one resolved parent",
     "dictionary": "standard",
-    "script": "set category = \"Verb\", definition@fr = \"Un animal\"\n  on sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "script": "set definition@en = \"A pig\", definition@fr = \"Un animal\"\n  on sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
     "expect": { "status": "ok", "effects": [
-      { "kind": "propertyReplaced", "property": "category", "language": null, "oldValue": "Noun", "newValue": "Verb" },
+      { "kind": "propertyReplaced", "property": "definition", "language": "en", "oldValue": "A four-legged terrestrial animal", "newValue": "A pig" },
       { "kind": "propertySet", "property": "definition", "language": "fr", "oldValue": null, "newValue": "Un animal" } ] } },
 
   { "id": "C-022", "section": "5.6", "syntax": "LiftPatchRef",
@@ -5221,9 +5566,9 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-026", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
     "description": "in a property command every path link is existential",
     "dictionary": "standard",
-    "script": "s /e[f=\"mami\"]/s[g=\"taro\"] (c = \"Noun\")",
+    "script": "s /e[f=\"mami\"]/s[g=\"taro\"]/c (v = \"Noun\")",
     "expect": { "status": "ok", "effects": [
-      { "kind": "propertySet", "property": "category", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
 
   { "id": "C-027", "section": "Part 3, 3", "syntax": "LiftPatchShort",
     "description": "the link between the path and the target is strict, so the homophones are ambiguous",
@@ -5256,7 +5601,7 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-031", "section": "5.4.2", "syntax": "LiftPatchRef",
     "description": "an ordinal is allowed as the step of an on clause, and forbidden as a property",
     "dictionary": "standard",
-    "script": "set text@tpi = \"mi shutim pik\"\n  on example#1\n  within sense[category = \"Noun\"]\n  within entry[form@tww = \"mami\"]",
+    "script": "set text@tpi = \"mi shutim pik\"\n  on example#1\n  within sense[has category[value = \"Noun\"]]\n  within entry[form@tww = \"mami\"]",
     "expect": { "status": "ok", "effects": [
       { "kind": "propertySet", "property": "text", "language": "tpi", "oldValue": null, "newValue": "mi shutim pik" } ] } },
 
@@ -5296,10 +5641,10 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-037", "section": "5.6", "syntax": "LiftPatchRef",
     "description": "each applies the assignment to every matched component, in document order",
     "dictionary": "standard",
-    "script": "set category = \"Verb\"\n  on each sense[exists(gloss@en)]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "script": "set value = \"Verb\"\n  on each category\n  of sense[exists(gloss@en)]\n  of entry[form@tww = \"mami\", hn = 1]",
     "expect": { "status": "ok", "effects": [
-      { "kind": "propertyReplaced", "property": "category", "language": null, "oldValue": "Noun", "newValue": "Verb" },
-      { "kind": "propertyReplaced", "property": "category", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
 
   { "id": "C-038", "section": "5.6", "syntax": "LiftPatchRef",
     "description": "a marked step matching nothing succeeds, changes nothing, and warns",
@@ -5360,14 +5705,14 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-045", "section": "5.1.3", "syntax": "LiftPatchRef",
     "description": "a has predicate refines strategy S3 on a component type that is not an entry",
     "dictionary": "standard",
-    "script": "set category = \"Verb\"\n  on sense[gloss@en = \"pig\", has example[text@tww = \"a mami jefo\"]]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"pig\", has example[text@tww = \"a mami jefo\"]]\n  of entry[form@tww = \"mami\", hn = 1]",
     "expect": { "status": "ok", "effects": [
-      { "kind": "propertyReplaced", "property": "category", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
 
   { "id": "C-046", "section": "7.3", "syntax": "LiftPatchRef",
     "description": "a chain that does not reach the root is refused before any lookup",
     "dictionary": "standard",
-    "script": "set category = \"Verb\" on sense[gloss@en = \"pig\"]",
+    "script": "set value = \"Verb\" on category of sense[gloss@en = \"pig\"]",
     "expect": { "status": "error", "code": "INCOMPLETE_ANCESTOR_CHAIN", "kind": "static", "commandIndex": 1 } },
 
   { "id": "C-047", "section": "7.2", "syntax": "LiftPatchRef",
@@ -5403,13 +5748,13 @@ implementation MAY add cases; it MUST pass these.
   { "id": "C-052", "section": "Part 3, 3.3", "syntax": "LiftPatchShort",
     "description": "an indented block anchors its commands to the component of the line above",
     "dictionary": "standard",
-    "script": "c e(\"mimi\")\n  c s(\"lizard\")\n    s (c = \"Noun\")",
+    "script": "c e(\"mimi\")\n  c s(\"lizard\")\n    s (d@en = \"A lizard\")",
     "expect": { "status": "ok", "effects": [
       { "kind": "componentCreated", "componentType": "entry", "position": null },
       { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mimi" },
       { "kind": "componentCreated", "componentType": "sense", "position": 1 },
       { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" },
-      { "kind": "propertySet", "property": "category", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+      { "kind": "propertySet", "property": "definition", "language": "en", "oldValue": null, "newValue": "A lizard" } ] } },
 
   { "id": "C-053", "section": "Part 3, 8", "syntax": "LiftPatchShort",
     "description": "the idiomatic upsert extends to the third abbreviated step, the example text",
@@ -5488,7 +5833,123 @@ implementation MAY add cases; it MUST pass these.
     "dictionary": "standard",
     "script": "m /e[f=\"mami\", hn=1]!s[g=\"pig\"] x#1 to /e[f=\"mami\", hn=1]!s[g=\"pork\"] at end",
     "expect": { "status": "ok", "effects": [
-      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 1 } ] } }
+      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 1 } ] } },
+
+  { "id": "C-064", "section": "3.1", "syntax": "LiftPatchRef",
+    "description": "a singleton is written on with a property command and needs no selector",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-065", "section": "3.1", "syntax": "LiftPatchRef",
+    "description": "a singleton always exists, so its value may be set on a sense the fixture gives none for",
+    "dictionary": "standard",
+    "script": "set value = \"Noun\"\n  on category\n  of sense[gloss@en = \"taro\"]\n  of entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+
+  { "id": "C-066", "section": "3.1", "syntax": "LiftPatchRef",
+    "description": "a singleton cannot be created",
+    "dictionary": "standard",
+    "script": "create category(value = \"Noun\") under sense[gloss@en = \"taro\"] of entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-067", "section": "8.4", "syntax": "LiftPatchRef",
+    "description": "a singleton cannot be deleted",
+    "dictionary": "standard",
+    "script": "delete category under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-068", "section": "5.1.3", "syntax": "LiftPatchRef",
+    "description": "a singleton takes no selector in a unique position",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on category[value = \"Noun\"]\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "SINGLETON_TAKES_NO_SELECTOR", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-069", "section": "5.1.4", "syntax": "LiftPatchRef",
+    "description": "a singleton step inside a has predicate is a filtering step and may carry a predicate list",
+    "dictionary": "standard",
+    "script": "set definition@fr = \"Un animal\"\n  on sense[gloss@en = \"pig\", has category[value = \"Noun\"]]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "definition", "language": "fr", "oldValue": null, "newValue": "Un animal" } ] } },
+
+  { "id": "C-070", "section": "5.6", "syntax": "LiftPatchRef",
+    "description": "a marked singleton step distributes over its hosts, which become the filtering step",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on each category\n  of sense[exists(gloss@en)]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-071", "section": "5.3.4", "syntax": "LiftPatchRef",
+    "description": "a typed component is selected by its type key",
+    "dictionary": "standard",
+    "script": "create note(type = \"general\", text@en = \"recorded at Yakoro\") under entry[form@tww = \"memi\"]\nset text@en = \"recorded at Yakoro, 2025\" on note^general of entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "note", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "general" },
+      { "kind": "propertySet", "property": "text", "language": "en", "oldValue": null, "newValue": "recorded at Yakoro" },
+      { "kind": "propertyReplaced", "property": "text", "language": "en", "oldValue": "recorded at Yakoro", "newValue": "recorded at Yakoro, 2025" } ] } },
+
+  { "id": "C-072", "section": "5.3.4", "syntax": "LiftPatchRef",
+    "description": "a type key that matches no sibling is NOT_FOUND, like any other selector that matched nothing",
+    "dictionary": "standard",
+    "script": "delete note^general under entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "NOT_FOUND", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-073", "section": "5.3.4", "syntax": "LiftPatchRef",
+    "description": "a type key on a component type that is not typed is rejected statically",
+    "dictionary": "standard",
+    "script": "delete example^free under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_TYPED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-074", "section": "5.3.3", "syntax": "LiftPatchRef",
+    "description": "an ordinal on a typed component type is rejected statically: a map has no first element",
+    "dictionary": "standard",
+    "script": "delete translation#1 under example#1 of sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_ORDERED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-075", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "move applies to ordered components only",
+    "dictionary": "standard",
+    "script": "move translation[type = \"free\"]\n  under example#1 of sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  at beginning",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_ORDERED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-076", "section": "6.2", "syntax": "LiftPatchRef",
+    "description": "an at clause on a typed component is rejected statically",
+    "dictionary": "standard",
+    "script": "create note(type = \"general\", text@en = \"…\") under entry[form@tww = \"memi\"] at beginning",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_ORDERED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-077", "section": "Part 3, 4.2.1", "syntax": "LiftPatchShort",
+    "description": "the concise syntax writes the type key and the singleton step the same way",
+    "dictionary": "standard",
+    "script": "s /e[f=\"mami\", hn=1]!s[g=\"pig\"]/c (v = \"Verb\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-078", "section": "Part 3, 4.2.1", "syntax": "LiftPatchShort",
+    "description": "a concise type key selects a typed component",
+    "dictionary": "standard",
+    "script": "c /memi n(y=\"general\", t@en = \"recorded at Yakoro\")\nu /memi n^general (t@en = \"recorded at Yakoro, 2025\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "note", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "general" },
+      { "kind": "propertySet", "property": "text", "language": "en", "oldValue": null, "newValue": "recorded at Yakoro" },
+      { "kind": "propertyReplaced", "property": "text", "language": "en", "oldValue": "recorded at Yakoro", "newValue": "recorded at Yakoro, 2025" } ] } },
+
+  { "id": "C-079", "section": "Part 3, 2", "syntax": "LiftPatchShort",
+    "description": "a quoted step is always an abbreviated step, a bare singleton name never is",
+    "dictionary": "standard",
+    "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] \"c\"",
+    "expect": { "status": "error", "code": "NOT_FOUND", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-080", "section": "Part 3, 4.2.1", "syntax": "LiftPatchShort",
+    "description": "a singleton cannot be deleted in the concise syntax either",
+    "dictionary": "standard",
+    "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] c",
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } }
 ]
 ```
 
