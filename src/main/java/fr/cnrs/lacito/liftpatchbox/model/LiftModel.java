@@ -50,30 +50,31 @@ import javafx.collections.ObservableList;
  * once against the metamodel, and what confines to one file the handful of places
  * where the two models do not line up.</p>
  *
- * <h2>Where the two models differ</h2>
+ * <h2>The metamodel and the object model agree</h2>
  *
- * <p>The metamodel of Appendix A is slightly wider than the object model. These
- * are the gaps, and each of them raises {@link UnsupportedByModelException}
- * rather than being silently ignored:</p>
+ * <p>Every component type, every property and every parentage the metamodel of
+ * Appendix A declares has a home in the dictionary model, and nothing this class
+ * is asked to do is refused for want of somewhere to put it. Two declarations of
+ * the metamodel exist precisely so that this remains true, and changing either of
+ * them would reopen a gap:</p>
  *
  * <ul>
- *   <li>{@code entry.morpheme} has no field in the dictionary model;</li>
- *   <li>{@code reversal.target} has no field: a reversal carries forms and a type,
- *       and no reference;</li>
- *   <li>the {@code url} of an {@code illustration} and of a {@code media} is fixed
- *       when the component is built and cannot be rewritten afterwards;</li>
- *   <li>a {@code trait}, an {@code illustration} and a {@code media} hold no
- *       {@code field}, and an {@code illustration}, a {@code media} and a
- *       {@code reversal} hold no {@code annotation};</li>
- *   <li>an {@code entry} holds no {@code reversal}: the dictionary model attaches
- *       reversals to senses only.</li>
+ *   <li>{@code trait.type} is declared {@code "writable": false} (section 4.5).
+ *       The dictionary model fixes a trait's definition when the trait is built,
+ *       and that definition is both the key the trait is stored under and what
+ *       gives its value a datatype. The language therefore refuses to rewrite it
+ *       with {@code PROPERTY_IS_READ_ONLY}, statically, rather than letting a
+ *       command reach a component that cannot carry it out;</li>
+ *   <li>a {@code reversal} holds only sub-reversals, and its natural identity is
+ *       {@code type + form} rather than {@code type + target}: the dictionary
+ *       model gives a reversal forms, a type and nested reversals, and no
+ *       reference, no trait, no annotation and no field.</li>
  * </ul>
  *
- * <p>Two further properties are approximated rather than refused, because the
- * approximation is faithful for every script that writes one language:
- * {@code etymology.source} is a multitext in the metamodel and a plain string in
- * the dictionary model, so it is read and written for one language at a time and
- * reported under the default meta language.</p>
+ * <p>{@link UnsupportedByModelException} therefore reports no condition a script
+ * can reach. It survives as an internal guard, for a combination the static
+ * validator should already have refused; reaching it is a defect of this library,
+ * not of the script.</p>
  *
  * <h2>Mutation and rollback</h2>
  *
@@ -439,10 +440,7 @@ public final class LiftModel {
     private Optional<String> scalarOfNode(ComponentRef.Node ref, String property) {
         AbstractLiftRoot node = ref.node();
         return switch (node) {
-            case LiftEntry _ -> switch (property) {
-                case "morpheme" -> throw unsupportedProperty("entry", "morpheme");
-                default -> Optional.empty();
-            };
+            case LiftEntry _ -> Optional.empty();
             case LiftEtymology y -> switch (property) {
                 case "type" -> featureId(y.getType());
                 default -> Optional.empty();
@@ -457,11 +455,8 @@ public final class LiftModel {
                 case "target" -> reference(r.getRefId(), r.getRefObject());
                 default -> Optional.empty();
             };
-            case LiftReversal l -> switch (property) {
-                case "type" -> featureId(l.getType());
-                case "target" -> throw unsupportedProperty("reversal", "target");
-                default -> Optional.empty();
-            };
+            case LiftReversal l -> "type".equals(property)
+                ? featureId(l.getType()) : Optional.empty();
             case LiftIllustration i -> "url".equals(property)
                 ? Optional.ofNullable(i.getHref()) : Optional.empty();
             case LiftMedia m -> "url".equals(property)
@@ -576,10 +571,6 @@ public final class LiftModel {
      * @return the value, or empty when it is unset
      */
     public Optional<String> qualified(ComponentRef ref, String property, String language) {
-        if (isEtymologySource(ref, property)) {
-            LiftEtymology y = (LiftEtymology) ((ComponentRef.Node) ref).node();
-            return Optional.ofNullable(y.getSource()).filter(s -> !s.isEmpty());
-        }
         return multitext(ref, property)
             .flatMap(m -> m.getForm(language))
             .map(Form::toPlainText);
@@ -593,22 +584,9 @@ public final class LiftModel {
      * @return the language codes, in the dictionary model's order
      */
     public Set<String> languagesOf(ComponentRef ref, String property) {
-        if (isEtymologySource(ref, property)) {
-            LiftEtymology y = (LiftEtymology) ((ComponentRef.Node) ref).node();
-            String value = y.getSource();
-            return value == null || value.isEmpty()
-                ? Set.of()
-                : Set.of(firstLanguage(LanguageKind.META));
-        }
         return multitext(ref, property)
             .map(m -> (Set<String>) new LinkedHashSet<>(m.getLangs()))
             .orElse(Set.of());
-    }
-
-    private static boolean isEtymologySource(ComponentRef ref, String property) {
-        return "source".equals(property)
-            && ref instanceof ComponentRef.Node node
-            && node.node() instanceof LiftEtymology;
     }
 
     // ===================================================================
@@ -691,8 +669,8 @@ public final class LiftModel {
                         journal.record(() -> t.setValue(old));
                     }
                     case "type" -> throw new UnsupportedByModelException(
-                        "the dictionary model fixes the `type` of a trait when the trait is "
-                            + "built; delete the trait and create it with the new type");
+                        "`trait.type` is read-only (section 4.5) and the validator refuses a "
+                            + "command that writes it; reaching this point is a defect");
                     default -> throw unsupportedProperty("trait", property);
                 }
             }
@@ -737,8 +715,22 @@ public final class LiftModel {
                 }
                 setCategoryValue(g.getParent(), value);
             }
-            case LiftIllustration _ -> throw unsupportedProperty("illustration", property);
-            case LiftMedia _ -> throw unsupportedProperty("media", property);
+            case LiftIllustration i -> {
+                if (!"url".equals(property)) {
+                    throw unsupportedProperty("illustration", property);
+                }
+                String old = i.getHref();
+                i.setHref(value);
+                journal.record(() -> i.setHref(old));
+            }
+            case LiftMedia m -> {
+                if (!"url".equals(property)) {
+                    throw unsupportedProperty("media", property);
+                }
+                String old = m.getHref();
+                m.setHref(value);
+                journal.record(() -> m.setHref(old));
+            }
             default -> throw unsupportedProperty(ref.componentType(), property);
         }
     }
@@ -752,10 +744,6 @@ public final class LiftModel {
      * @param value    the new text
      */
     public void setQualified(ComponentRef ref, String property, String language, String value) {
-        if (isEtymologySource(ref, property)) {
-            setScalar(ref, "source", value);
-            return;
-        }
         MultiText multitext = multitext(ref, property)
             .orElseThrow(() -> unsupportedProperty(ref.componentType(), property));
         String old = multitext.getForm(language).map(Form::toPlainText).orElse(null);
@@ -781,10 +769,6 @@ public final class LiftModel {
      * @param language the language code
      */
     public void removeQualified(ComponentRef ref, String property, String language) {
-        if (isEtymologySource(ref, property)) {
-            setScalar(ref, "source", null);
-            return;
-        }
         MultiText multitext = multitext(ref, property)
             .orElseThrow(() -> unsupportedProperty(ref.componentType(), property));
         if (!multitext.containsLang(language)) {
@@ -1114,9 +1098,6 @@ public final class LiftModel {
     }
 
     private ComponentRef createReversal(ComponentRef parent, NewComponent spec, Integer position) {
-        if (spec.scalars().containsKey("target")) {
-            throw unsupportedProperty("reversal", "target");
-        }
         LiftReversal reversal = new LiftReversal(
             dictionary.getHeader().getInverseTypeManager()
                 .getOrCreateFeature(required(spec, "type", "reversal")));

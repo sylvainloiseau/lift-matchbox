@@ -36,7 +36,7 @@ create exemple(text="A mamimo jefimwij")
 }
 ### Or use the concise syntax:
 
-set category = "Noun" on sense[gloss="pig"] of entry[form="mami"]
+set value = "Noun" on category of sense[gloss="pig"] of entry[form="mami"]
 
 A very usefull construct
 p /mami/pig         # - create new mami entry with the sense "pig"
@@ -77,95 +77,162 @@ The complete DSL language allows to create/update/delete any kind of nodes in th
 
 ## Command-line usage
 
-The Maven package contains an executable JAR with the Lift-DSL CLI:
-
-```bash
-# Create and patch a new empty dictionary
-java -jar target/lift-patchbox-0.1-SNAPSHOT.jar \
-  [--syntax reference|concise] \
-  <dsl-commands-file> \
-  <output-lift-file>
-
-# Load, patch, and save an existing dictionary
-java -jar target/lift-patchbox-0.1-SNAPSHOT.jar \
-  [--syntax reference|concise] \
-  <dsl-commands-file> \
-  <input-lift-file> \
-  <output-lift-file>
-  ```
-
-When only the output path is supplied, the CLI creates an empty dictionary
-with `tww` as its object language and `en` as its meta language.
-
-The syntax defaults to `reference`. Use `--syntax concise` for the
-line-oriented concise syntax. Existing input dictionaries are loaded with
-`LiftDictionary.loadDictionaryFromFile(File)`, patched transactionally, and
-saved to the output path.
-
-
-## Building
-
-### 1. Build with Maven
-
-```bash
-mvn clean compile
-```
-
-This will:
-- Generate ANTLR lexer and parser classes from `LiftDsl.g4`
-- Compile all Java source files
-
-### 2. Run Tests
-
-```bash
-mvn test
-```
-
-### 3. Build JAR
+The Maven build produces an executable JAR:
 
 ```bash
 mvn package
 ```
 
-Creates `target/lift-patchbox-0.1-SNAPSHOT.jar`
-
-### Programmatic Usage
-
-```java
-```
-
-## DSL Language Reference
-
-See `specification.md` for complete language specification, including:
-
-- Path syntax (short form, long form, indexed nodes)
-- Command types (Upsert, Create, Delete, Move, Update)
-- Language and type modifiers
-- Homophone handling
-- Semantic constraints
-
-### Generating ANTLR Classes
-
-If you modify `LiftDsl.g4`, regenerate the parser:
+`target/lift-patchbox-0.1-SNAPSHOT-jar-with-dependencies.jar` is self-contained.
 
 ```bash
-mvn antlr4:antlr4
+# patch an existing dictionary
+java -jar target/lift-patchbox-0.1-SNAPSHOT-jar-with-dependencies.jar \
+  edits.liftpatchs tww.lift tww-patched.lift --syntax concise
+
+# start from an empty dictionary: only the output path is given
+java -jar target/lift-patchbox-0.1-SNAPSHOT-jar-with-dependencies.jar \
+  edits.liftpatch new.lift
+
+# see what a script would do, and change nothing
+java -jar target/lift-patchbox-0.1-SNAPSHOT-jar-with-dependencies.jar \
+  edits.liftpatch tww.lift out.lift --plan
+
+# emit the plan document of section 12.4.1 as JSON
+java -jar target/lift-patchbox-0.1-SNAPSHOT-jar-with-dependencies.jar \
+  edits.liftpatch tww.lift out.lift --plan --json
 ```
 
-This updates the generated files in `target/generated-sources/antlr4`.
+The surface syntax is decided in this order: the script's `%liftpatch` pragma
+when it declares `syntax=`, then `--syntax`, then the file extension —
+`.liftpatch` for the reference syntax and `.liftpatchs` for the concise one.
+Getting it wrong is otherwise silent, which is why a document in which not one
+line was recognized as a command is reported with a `NO_COMMAND_RECOGNIZED`
+warning.
+
+Other options:
+
+| Option | What it does |
+|---|---|
+| `--plan`, `-p` | Report what the script would do and change nothing. |
+| `--json` | Print the plan document as JSON rather than as prose. |
+| `--object-language`, `--meta-language` | Set the default languages, overriding the dictionary's first ones. |
+| `--metamodel <file>` | Validate against an extended metamodel (Appendix A). |
+| `--verbose`, `-v` / `--quiet`, `-q` | Log how the commands are built / errors and warnings only. |
+
+The tool always validates before it writes, and never writes a partially applied
+dictionary: a script either succeeds completely or leaves the output file
+unwritten.
+
+## Programmatic usage
+
+```java
+LiftDictionary dictionary = LiftDictionary.loadDictionaryFromFile(new File("tww.lift"));
+
+LiftPatchBox box = new LiftPatchBox()
+    .withDefaultObjectLanguage("tww")
+    .withDefaultMetaLanguage("en");
+
+Plan plan = box.plan(dictionary, script, Syntax.CONCISE, "edits.liftpatchs");
+if (plan.isOk()) {
+    box.apply(dictionary, script, Syntax.CONCISE, "edits.liftpatchs");
+    dictionary.save(new File("tww-patched.lift"));
+}
+```
+
+Commands can also be built without writing a script at all, through the same
+fluent API the two parsers use:
+
+```java
+Script script = LiftPatch.script(Syntax.REFERENCE)
+    .add(LiftPatch.create("sense")
+            .init("gloss", "en", "pig")
+            .under(LiftPatch.chain(LiftPatch.step("entry").eq("form", "tww", "mami")))
+            .as("pig"))
+    .add(LiftPatch.set()
+            .assign("definition", "en", "A four-legged terrestrial animal")
+            .on(LiftPatch.chain(LiftPatch.label("pig"))))
+    .build();
+```
+
+A command built that way is checked by the same validator, against the same
+metamodel, and is rejected with the same error codes as a parsed one.
+
+## How the code is laid out
+
+| Package | What it holds |
+|---|---|
+| `metamodel` | The normative metamodel of Appendix A, loaded from the very JSON document the specification prints, and the short-code tables of the concise syntax. |
+| `ast` | One immutable command model shared by both syntaxes, and `LiftPatch`, the fluent API that builds it. |
+| `parser` | The two ANTLR grammars, the concise-syntax preprocessor, and the two visitors. |
+| `validation` | Every error that depends only on the script text and the metamodel, collected rather than thrown. |
+| `engine` | Selector resolution, execution, the plan document, the run summary. |
+| `model` | The one place that knows how the metamodel maps onto the `lift-api` dictionary model, and the journal that makes a script atomic. |
+| `error` | The codes of Appendix B, with their kinds. |
+| `cli` | The command-line tool. |
+
+Both surface syntaxes produce the same command objects: a LiftPatchShort path,
+written ancestor first, is reversed into the child-first chain the reference
+syntax writes, and the concise abbreviations are expanded. Everything
+downstream — validation, resolution, execution, plan mode — is therefore written
+once.
+
+## Building
+
+```bash
+mvn clean package     # generates the parsers, compiles, tests, builds the JARs
+mvn test              # the test suite alone
+mvn javadoc:javadoc   # the API documentation, under target/reports/apidocs
+```
+
+The build needs `fr.cnrs.lacito:lift-api:0.1-SNAPSHOT` in the local Maven
+repository. The ANTLR sources are `src/main/antlr4/.../LiftPatchRef.g4` and
+`LiftPatchShort.g4`; `mvn generate-sources` regenerates the parsers into
+`target/generated-sources/antlr4` on its own, so there is nothing to check in.
+
+## Tests
+
+| Suite | What it checks |
+|---|---|
+| `ConformanceCorpusTest` | The 80 cases of Appendix D, run exactly as D.1 defines the comparison. |
+| `SpecificationExamplesTest` | Every fenced `LiftPatchRef` and `LiftPatchShort` example of `specification.md` parses and is statically valid. |
+| `ComponentCommandsTest`, `PropertyCommandsTest` | The eight verbs, grouped by verb. |
+| `SelectionTest` | The seven selection strategies, the two axes, the pseudo-properties, multiplicity, references. |
+| `ConstructsTest` | Blocks, labels, language scoping, embedded initializers, atomicity, plan mode. |
+| `ConciseSyntaxTest` | Line recognition, abbreviations, indented blocks, the `p /path` idiom, and agreement with the reference syntax. |
+| `TuwuliDictionaryTest` | A real 1925-entry field dictionary: patch, save, reload, roll back. |
+
+## The metamodel and the dictionary model
+
+Every component type, every property and every parentage the metamodel of
+Appendix A declares has a home in the `lift-api` object model this library
+writes through, so no script is ever refused for want of somewhere to put its
+result. Two declarations of the metamodel exist to keep that true, and both are
+part of the language rather than workarounds:
+
+- **`trait.type` is read-only** (specification, section 4.5). The dictionary
+  model fixes a trait's definition when the trait is built, and that definition
+  is both the key the trait is stored under and what gives its value a datatype.
+  `set`, `update` and `clear` on it therefore raise `PROPERTY_IS_READ_ONLY`, a
+  static error; to give a trait another type, delete it and create it again. It
+  is the only read-only property, and `writable: false` in Appendix A is what
+  declares it, so an extended metamodel may declare others.
+- **A `reversal` holds only sub-reversals, and its natural identity is
+  `type + form`.** The dictionary model gives a reversal forms, a type and
+  nested reversals — no reference, and no trait, annotation or field.
+
+## DSL language reference
+
+`specification.md` is the single source of truth: the data model and semantics
+(Part 1), the reference syntax (Part 2), the concise syntax (Part 3), the
+normative metamodel (Appendix A), the error codes (Appendix B), the grammars
+(Appendix C) and the conformance corpus (Appendix D).
 
 ## License
 
 This project is part of the LIFT ecosystem and follows its licensing terms.
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit changes
-4. Push to the branch
-5. Open a pull request
-
 ## Contact
 
-For questions or issues, refer to the LIFT project documentation or create an issue in the repository.
+For questions or issues, refer to the LIFT project documentation or create an
+issue in the repository.

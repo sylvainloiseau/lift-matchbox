@@ -145,7 +145,10 @@ public final class Metamodel {
                 Datatype.parse(Json.string(p, "datatype")),
                 LanguageKind.parse(Json.string(p, "qualifier")),
                 Json.bool(p, "required", false),
-                identity.contains(e.getKey())
+                identity.contains(e.getKey()),
+                // `writable` defaults to true, which it is for every property but
+                // one; a read-only property declares itself (Appendix A).
+                Json.bool(p, "writable", true)
             ));
         }
         return new ComponentTypeDef(

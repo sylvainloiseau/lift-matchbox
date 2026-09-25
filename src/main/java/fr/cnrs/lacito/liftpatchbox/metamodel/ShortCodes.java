@@ -43,7 +43,6 @@ public final class ShortCodes {
         COMPONENTS.put("c", "category");
 
         PROPERTIES.put("f", "form");
-        PROPERTIES.put("m", "morpheme");
         PROPERTIES.put("d", "definition");
         PROPERTIES.put("g", "gloss");
         PROPERTIES.put("t", "text");

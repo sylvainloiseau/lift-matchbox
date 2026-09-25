@@ -23,6 +23,8 @@ public enum ErrorCode {
     UNSUPPORTED_METAMODEL(ErrorKind.STATIC),
     /** A property is used on a component type the metamodel does not define it on. */
     PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE(ErrorKind.STATIC),
+    /** {@code set}, {@code update} or {@code clear} names a property the metamodel declares read-only. */
+    PROPERTY_IS_READ_ONLY(ErrorKind.STATIC),
     /** Two component types are stated to be parent and child where the metamodel does not relate them. */
     ILLEGAL_PARENT(ErrorKind.STATIC),
     /** A language qualifier is written on a scalar property. */
@@ -133,18 +135,7 @@ public enum ErrorCode {
     /** A meta language code is not in the dictionary's meta language list. */
     NO_SUCH_META_LANGUAGE(ErrorKind.DYNAMIC),
     /** {@code language-create} names a language the dictionary already has. */
-    LANGUAGE_ALREADY_EXISTS(ErrorKind.DYNAMIC),
-
-    /**
-     * An operation the specification defines but the underlying {@code lift-api}
-     * dictionary model cannot express.
-     *
-     * <p>This code is outside Appendix B: it never reports a defect of the script,
-     * only a limit of this implementation's storage layer. It is raised, for
-     * instance, when a script assigns the {@code target} of a {@code reversal},
-     * which the {@code lift-api} model does not carry.</p>
-     */
-    UNSUPPORTED_BY_DICTIONARY_MODEL(ErrorKind.DYNAMIC);
+    LANGUAGE_ALREADY_EXISTS(ErrorKind.DYNAMIC);
 
     private final ErrorKind kind;
 

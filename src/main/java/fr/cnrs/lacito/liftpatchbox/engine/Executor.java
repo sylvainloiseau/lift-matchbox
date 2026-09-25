@@ -131,12 +131,6 @@ public final class Executor {
             operations.add(new Operation(
                 failure.operationIndex(), failure.position(), null, null, null,
                 null, null, List.of(), null, failure));
-        } catch (UnsupportedByModelException e) {
-            failure = new LiftPatchError(ErrorCode.UNSUPPORTED_BY_DICTIONARY_MODEL,
-                e.getMessage(), SourcePosition.UNKNOWN, operationIndex);
-            operations.add(new Operation(
-                operationIndex, SourcePosition.UNKNOWN, null, null, null,
-                null, null, List.of(), null, failure));
         }
 
         if (failure != null) {

@@ -441,6 +441,16 @@ public final class SemanticValidator {
             return;
         }
         PropertyDef p = property.get();
+        if (p.isReadOnly()) {
+            // A read-only property is refused before its role, its datatype or its
+            // current state is consulted (section 4.5).
+            error(ErrorCode.PROPERTY_IS_READ_ONLY,
+                "`" + p.qualifiedName() + "` is fixed when the component is created and is "
+                    + "never written again; to give it another value, delete the component and "
+                    + "create it with the value wanted",
+                ref.position());
+            return;
+        }
         if (!checkQualifier(ref, p, false)) {
             return;
         }
@@ -460,6 +470,13 @@ public final class SemanticValidator {
             return;
         }
         PropertyDef p = property.get();
+        if (p.isReadOnly()) {
+            error(ErrorCode.PROPERTY_IS_READ_ONLY,
+                "`" + p.qualifiedName() + "` is fixed when the component is created and is "
+                    + "never removed either",
+                ref.position());
+            return;
+        }
         if (p.datatype().isMultitext()) {
             if (!ref.hasQualifier()) {
                 error(ErrorCode.MISSING_LANGUAGE_QUALIFIER,

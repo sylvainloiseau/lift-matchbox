@@ -13,6 +13,7 @@ package fr.cnrs.lacito.liftpatchbox.metamodel;
  * @param qualifier     the language kind of a multitext, or {@code null} for a scalar
  * @param required      whether the property must be initialized at creation
  * @param identity      whether the property belongs to the natural identity property set
+ * @param writable      whether the property may be written once the component exists
  */
 public record PropertyDef(
     String componentType,
@@ -20,7 +21,8 @@ public record PropertyDef(
     Datatype datatype,
     LanguageKind qualifier,
     boolean required,
-    boolean identity
+    boolean identity,
+    boolean writable
 ) {
 
     /**
@@ -30,6 +32,21 @@ public record PropertyDef(
      */
     public PropertyRole role() {
         return PropertyRole.of(identity, required, datatype.isMultitext());
+    }
+
+    /**
+     * Whether this property is read-only: fixed when its component is created, and
+     * never written again (section 4.5 of the specification).
+     *
+     * <p>{@code trait.type} is the only one in the metamodel of Appendix A. A
+     * {@code set}, an {@code update} or a {@code clear} naming a read-only property
+     * raises {@code PROPERTY_IS_READ_ONLY}, and that check is made before the
+     * property's role is consulted, so it is the code reported.</p>
+     *
+     * @return {@code true} when the metamodel declares {@code "writable": false}
+     */
+    public boolean isReadOnly() {
+        return !writable;
     }
 
     /**

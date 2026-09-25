@@ -297,17 +297,17 @@ The allowed parent-child relationships are:
 | Parent | Allowed child components |
 |---|---|
 | Dictionary | `entry`|
-| Entry | `sense`, `etymology`, `variant`, `relation`, `pronunciation`, `reversal`, `trait`, `annotation`, `note`, `field` |
+| Entry | `sense`, `etymology`, `variant`, `relation`, `pronunciation`, `trait`, `annotation`, `note`, `field` |
 | Sense | `sense`, `example`, `relation`, `illustration`, `reversal`, `trait`, `annotation`, `note`, `field`, `category` |
 | Variant | `pronunciation`, `relation`, `trait`, `annotation`, `field` |
 | Pronunciation | `media`, `trait`, `annotation`, `field` |
 | Example | `translation`, `trait`, `annotation`, `field` |
 | Etymology | `trait`, `annotation`, `field` |
 | Relation | `trait`, `annotation`, `field` |
-| Reversal | `trait`, `annotation`, `field` |
-| Trait | `annotation`, `field` |
-| Illustration | `annotation`, `field` |
-| Media | `annotation`, `field` |
+| Reversal | `reversal` |
+| Trait | `annotation` |
+| Illustration | |
+| Media | |
 | Annotation | |
 | Note | `annotation` |
 | Field | `annotation` |
@@ -378,7 +378,7 @@ always designates at most one component. There is no first or second `note`, so:
 
 - an ordinal on a typed component raises `COMPONENT_NOT_ORDERED`, a static error;
 - an `at POSITION` clause on a command creating a typed component raises `COMPONENT_NOT_ORDERED`;
-- `move` on a typed component raises `COMPONENT_NOT_ORDERED`. A typed component is re-keyed by writing its `type`, not by moving it, and is re-parented by deleting it and creating it under the new parent;
+- `move` on a typed component raises `COMPONENT_NOT_ORDERED`. A typed component is re-keyed by writing its `type`, not by moving it — unless that `type` is read-only, as a `trait`'s is (section "4.5") — and is re-parented by deleting it and creating it under the new parent;
 - the type key `^t` (section "5.3.4") is the concise way to designate one, in both syntaxes: `note^general` is `note[type = "general"]`.
 
 **Singleton components.** A singleton is not a collection at all: a host
@@ -432,48 +432,47 @@ The following table lists the properties. Each row gives a property name; the fo
   - `—` — no language qualifier.
 - `Required at creation`: indicate whether this property must be initialized with a value at creation. For a multitext, this means that at least one qualified value must be set. On a **singleton** component type (section "3.1"), which is never created, every property is necessarily "no": there is no creation at which to require one.
 - `Natural identity`: indicate if this property belongs to the *natural identity property set* of the component type, as defined in section "5.2". A component type has a natural identity property set of zero, one, or two properties. When a multitext belongs to that set, only *same-language* values are compared: a qualified value `p@L` of one component is compared with the qualified value `p@L` of a sibling for the same language `L`, never with a value in another language, and unset qualified values never take part in the comparison.
+- `Writable`: indicate whether the property may be changed once the component exists. Almost every property may; a *read-only* property is one that is fixed when the component is created and can never be written again (section "4.5").
 
 The table is exhaustive and normative for semantic validation. It is the
 human-readable rendering of the normative metamodel given in "Appendix A. The
 normative metamodel"; in case of divergence, Appendix A prevails.
 
-| Component | Property | Datatype | Qualifier | Required at creation | Natural identity |
-|---|---|---|---|---:|---:|
-| Entry | `form` | multitext | O | yes, at least one qualified value | no |
-| Entry | `morpheme` | string | — | no | no |
-| Sense | `gloss` | multitext | M | yes, at least one qualified value | yes: one qualified value |
-| Sense | `definition` | multitext | M | no | no |
-| Category | `value` | string | — | no | no |
-| Example | `text` | multitext | O | yes, at least one qualified value | yes: one qualified value |
-| Etymology | `form` | multitext | O | yes, at least one qualified value | part of `type + form` |
-| Etymology | `gloss` | multitext | M | no | no |
-| Etymology | `source` | multitext | M | no | no |
-| Etymology | `type` | string | — | yes | part of `type + form` |
-| Variant | `type` | string | — | yes | part of `type + target` |
-| Variant | `target` | reference | — | yes | part of `type + target` |
-| Relation | `type` | string | — | yes | part of `type + target` |
-| Relation | `target` | reference | — | yes | part of `type + target` |
-| Reversal | `form` | multitext | O | no | no |
-| Reversal | `type` | string | — | yes | part of `type + target` |
-| Reversal | `target` | reference | — | yes | part of `type + target` |
-| Illustration | `url` | URL | — | yes | yes |
-| Illustration | `label` | multitext | M | no | no |
-| Media | `url` | URL | — | yes | yes |
-| Media | `label` | multitext | M | no | no |
-| Pronunciation | `transcription` | multitext | O | yes, at least one qualified value | yes: one qualified value |
-| Trait | `type` | string | — | yes | yes |
-| Trait | `value` | string | — | yes | no |
-| Annotation | `type` | string | — | yes | part of `type + value` |
-| Annotation | `value` | string | — | yes | part of `type + value` |
-| Annotation | `comment` | multitext | M | no | no |
-| Annotation | `when` | string | — | no | no |
-| Annotation | `who` | string | — | no | no |
-| Note | `type` | string | — | yes | yes |
-| Note | `text` | multitext | M | yes, at least one qualified value | no |
-| Field | `type` | string | — | yes | yes |
-| Field | `text` | multitext | M | yes, at least one qualified value | no |
-| Translation | `type` | string | — | yes | yes |
-| Translation | `text` | multitext | M | yes, at least one qualified value | no |
+| Component | Property | Datatype | Qualifier | Required at creation | Natural identity | Writable |
+|---|---|---|---|---:|---:|---:|
+| Entry | `form` | multitext | O | yes, at least one qualified value | no | yes |
+| Sense | `gloss` | multitext | M | yes, at least one qualified value | yes: one qualified value | yes |
+| Sense | `definition` | multitext | M | no | no | yes |
+| Category | `value` | string | — | no | no | yes |
+| Example | `text` | multitext | O | yes, at least one qualified value | yes: one qualified value | yes |
+| Etymology | `form` | multitext | O | yes, at least one qualified value | part of `type + form` | yes |
+| Etymology | `gloss` | multitext | M | no | no | yes |
+| Etymology | `source` | string | — | no | no | yes |
+| Etymology | `type` | string | — | yes | part of `type + form` | yes |
+| Variant | `type` | string | — | yes | part of `type + target` | yes |
+| Variant | `target` | reference | — | yes | part of `type + target` | yes |
+| Relation | `type` | string | — | yes | part of `type + target` | yes |
+| Relation | `target` | reference | — | yes | part of `type + target` | yes |
+| Reversal | `form` | multitext | O | yes, at least one qualified value | part of `type + form` | yes |
+| Reversal | `type` | string | — | yes | part of `type + form` | yes |
+| Illustration | `url` | URL | — | yes | yes | yes |
+| Illustration | `label` | multitext | M | no | no | yes |
+| Media | `url` | URL | — | yes | yes | yes |
+| Media | `label` | multitext | M | no | no | yes |
+| Pronunciation | `transcription` | multitext | O | yes, at least one qualified value | yes: one qualified value | yes |
+| Trait | `type` | string | — | yes | yes | **no** (section "4.5") |
+| Trait | `value` | string | — | yes | no | yes |
+| Annotation | `type` | string | — | yes | part of `type + value` | yes |
+| Annotation | `value` | string | — | yes | part of `type + value` | yes |
+| Annotation | `comment` | multitext | M | no | no | yes |
+| Annotation | `when` | string | — | no | no | yes |
+| Annotation | `who` | string | — | no | no | yes |
+| Note | `type` | string | — | yes | yes | yes |
+| Note | `text` | multitext | M | yes, at least one qualified value | no | yes |
+| Field | `type` | string | — | yes | yes | yes |
+| Field | `text` | multitext | M | yes, at least one qualified value | no | yes |
+| Translation | `type` | string | — | yes | yes | yes |
+| Translation | `text` | multitext | M | yes, at least one qualified value | no | yes |
 
 ### 4.2 The multitext datatype
 
@@ -555,8 +554,8 @@ one, because it is a shorthand for a predicate over the multitext `gloss`
 The validator MUST reject a combination of a scalar property with a language key with error `LANG_KEY_NOT_SUPPORTED_ON_SCALAR`. For example, the following are invalid:
 
 ```text
-morpheme@en
 value@en
+when@en
 ```
 
 #### 4.4.1 The `@*` wildcard qualifier
@@ -573,6 +572,41 @@ It is allowed only where a set of qualified values is meaningful:
 `@*` is forbidden in `create`, `upsert`, `set` and `update` initializers and
 targets, which must designate exactly one qualified value; the error is
 `WILDCARD_NOT_ALLOWED`.
+
+### 4.5 Read-only properties
+
+A **read-only** property is one that is fixed when its component is created and
+can never be written again. It is declared by the `Writable` column of the table
+of section "4.1", and by `writable: false` in the metamodel (Appendix A).
+
+A read-only property is an ordinary property in every other respect: it is
+initialized by `create` and by the create branch of `upsert` like any other, it
+is read by a selector like any other, and, being part of the natural identity of
+its component type, it is what a unique selector on that type is written with.
+What it refuses is being the property a command *writes*:
+
+- `set`, `update` and `clear` on a read-only property raise `PROPERTY_IS_READ_ONLY`, a static error;
+- the select branch of an `upsert` never writes one either. A read-only property necessarily belongs to the match part `K` of section "8.2.1", which is applied only by the create branch, so no rule has to be added for it;
+- `create` and the create branch of `upsert` are unaffected: that is the one moment at which the value is chosen.
+
+```text
+create trait(type = "CVpattern", value = "CVC") under entry[form@tww = "mami"]
+set value = "CVCV" on trait^CVpattern of entry[form@tww = "mami"]   # legal
+set type = "syllable" on trait^CVpattern of entry[form@tww = "mami"] # PROPERTY_IS_READ_ONLY
+```
+
+To give a component a read-only property it does not have, delete it and create
+it again with the value wanted. The language deliberately offers no other way:
+a property that the data model fixes at construction cannot be rewritten in
+place, and silently deleting and recreating the component behind the writer's
+back would lose its children and its position.
+
+In the metamodel of Appendix A, `trait.type` is the only read-only property.
+This is not an accident of the current version: a `trait` is a typed component
+whose `type` is the key it is stored under *and* the name of the definition that
+gives its value a datatype, so changing it would change what the value means.
+Every other typed component type — `note`, `field`, `translation` — is re-keyed
+by writing its `type` in the ordinary way (section "5.3.4").
 
 ## 5. Selection
 
@@ -1276,7 +1310,9 @@ set text@en = "borrowed from Tok Pisin"
 Since a typed component has no position, there is no `move` and no `at` clause
 for it: to change the key of a typed component, write its `type` with `set`,
 which re-keys it in place and is checked against the uniqueness invariant like
-any other identity assignment (section "5.2").
+any other identity assignment (section "5.2"). The one exception is the `trait`,
+whose `type` is read-only: it is re-keyed by deleting it and creating it again
+(section "4.5").
 
 ### 5.4 Command applicability
 
@@ -1310,6 +1346,7 @@ Reading rules:
 - "forbidden" in a selector column means that the predicate is rejected with `PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR`: a unique selector uses exactly one selection strategy (section "5.1.3") and carries no additional predicate, the only admitted supplement being the `has` refinement of strategies S3 and S4 and the `hn` refinement of S4, both of which are part of the strategy rather than additions to it.
 - R3 and R4 are "required" for `upsert` even though the select branch may make them unnecessary: which branch will run is not known statically, and the create branch must be able to satisfy section "6.1" rule 1.
 - The `clear` column implements one invariant: **a property that the metamodel declares required may never become unset**, and an identity property may never become unset. See the decision table in section "9.3.1".
+- A **read-only** property (section "4.5") is outside the last three columns of this table whatever its role: `set`, `update` and `clear` all raise `PROPERTY_IS_READ_ONLY` on one, and that check is made before the role is consulted, so it is the code reported rather than `CANNOT_CLEAR_IDENTITY_PROPERTY` or any other.
 
 #### 5.4.2 Applicability of pseudo-properties and labels
 
@@ -1336,7 +1373,7 @@ are easy to get wrong and each is exercised by the conformance corpus:
 
 - `id` and the ordinal are allowed as the step of an `on` clause: `set form = { tww: "mami" } on entry[id = "entry-42"]` and `set text@tpi = "…" on example#1 within sense[...]` are both legal (cases C-018 and C-031);
 - so are the type key and the singleton step: `set text@en = "…" on note^general of entry[...]` and `set value = "Noun" on category of sense[...]` are the ordinary way to write on a typed and on a singleton component;
-- none of them may be *written*: `set id = …`, `update hn = …`, `clear #2`, `set ^general = …` are all forbidden, whatever the component type. The `type` property of a typed component, by contrast, **is** an ordinary property and may be written: `set type = "general" on note^etymology` re-keys the note (section "5.3.4");
+- none of them may be *written*: `set id = …`, `update hn = …`, `clear #2`, `set ^general = …` are all forbidden, whatever the component type. The `type` property of a typed component, by contrast, **is** an ordinary property and may be written: `set type = "general" on note^etymology` re-keys the note (section "5.3.4"). A `trait`'s `type` is the one that may not, being read-only (section "4.5");
 - a label is a whole step and never a predicate, so `on $pig` is legal and `[label = $pig]` does not exist.
 
 ### 5.5 Language qualifier rules
@@ -2373,9 +2410,10 @@ move ORDERED-COMPONENT under PARENT [ under DESTINATION-PARENT ] at POSITION
 A `move` whose target step names a **typed** component type raises
 `COMPONENT_NOT_ORDERED`, a static error: `move note[type = "general"] …` asks to
 reorder a map. A typed component is re-keyed by writing its `type` with `set`
-(section "5.3.4"), and is re-parented by deleting it and creating it under the
-new parent, which is a different operation with different effects and is written
-out as such. A `move` whose target step names a **singleton** raises
+(section "5.3.4") — or, when that `type` is read-only as a `trait`'s is, by
+deleting it and creating it again (section "4.5") — and is re-parented by
+deleting it and creating it under the new parent, which is a different operation
+with different effects and is written out as such. A `move` whose target step names a **singleton** raises
 `SINGLETON_CANNOT_BE_CREATED_OR_DELETED`; `move entry[...]` remains the syntax
 error of section "2".
 
@@ -2521,6 +2559,10 @@ string to "all languages" is not a meaningful operation. `@*` is a reading and a
 removing qualifier, not an assigning one (section "4.4.1"); to assign several
 languages in one command, use a multi-language literal.
 
+`set` on a **read-only** property raises `PROPERTY_IS_READ_ONLY`, a static error
+(section "4.5"). The value of such a property is chosen at creation and never
+again.
+
 #### 9.1.1 Assignment lists
 
 A property command may carry an **assignment list**, so that the properties of
@@ -2541,7 +2583,8 @@ set definition@en = "A four-legged terrestrial animal",
 
 An assignment list is surface sugar with no semantics of its own, exactly like
 the multi-language literal of section "5.5.1", and the two may be combined
-(`set form = { tww: "mami", tpi: "pik" }, morpheme = "stem"`):
+(`set comment = { en: "checked", fr: "vérifié" }, who = "SL"` on an
+`annotation`):
 
 - A command carrying an assignment list is defined as being **exactly equivalent to the sequence of the corresponding single-property commands**, in the order written, with the same verb and the same `on` clause. Every rule of the single-property command applies unchanged to each element: availability, default languages, `@*` restrictions, the uniqueness invariant, and the `update` and `clear` preconditions.
 - The `on` clause is resolved **once**, before the first assignment, and the resolved component is shared by all of them. With `each`, the list is applied to every matched component, in the order of section "5.6".
@@ -2582,6 +2625,7 @@ of entry[form@tww = "mami"]
 - On a scalar property, if the property was not already set, an `UNSET_PROPERTY` error is raised.
 - On a multitext property, `update` targets exactly one **qualified** value, and the test bears on that qualified value alone: if the property was not already set *for the language targeted by the command*, an `UNSET_QUALIFIED_PROPERTY` error is raised, **even when the property has values for other languages**. `update definition@en = …` therefore fails on a sense that has only a `definition@fr`; `set` is the command to use in that case.
 - `update` never accepts the `@*` wildcard (`WILDCARD_NOT_ALLOWED`): it replaces one value, and replacing "all languages" with a single string is not a meaningful operation. To rewrite several languages at once, use a multi-language literal (section "5.5.1").
+- `update` on a **read-only** property raises `PROPERTY_IS_READ_ONLY`, a static error (section "4.5"), and it is raised before the property's current state is consulted.
 
 The same rule as above (under "set") regarding language applies: lang can be
 implicit.
@@ -2649,6 +2693,7 @@ only place where the outcome of a `clear` is decided.
 
 | Property role | Written as | State of the property | Result |
 |---|---|---|---|
+| Read-only, any role (section "4.5") | `clear p` | any | `PROPERTY_IS_READ_ONLY` |
 | Scalar, identity (R1) | `clear p` | any | `CANNOT_CLEAR_IDENTITY_PROPERTY` |
 | Scalar, required non-identity (R3) | `clear p` | any | `CANNOT_CLEAR_REQUIRED_PROPERTY` |
 | Scalar, optional (R5) | `clear p` | set | the value is removed |
@@ -2664,7 +2709,11 @@ only place where the outcome of a `clear` is decided.
 | Multitext, optional (R6) | `clear p@*` | at least one language is set | all the values are removed |
 | Multitext, optional (R6) | `clear p@*` | no language is set | `UNSET_PROPERTY` |
 
-Two invariants are behind the whole table:
+The first row takes precedence over every other: a read-only property is refused
+before its role is consulted, so `clear type on trait^CVpattern` is
+`PROPERTY_IS_READ_ONLY` and not `CANNOT_CLEAR_IDENTITY_PROPERTY`.
+
+Two invariants are behind the rest of the table:
 
 1. A property that the metamodel declares required, and any identity property, may never become unset. `clear` is refused rather than allowed to produce a component that `create` would have rejected.
 2. `clear` never removes a component. To remove a component, use `delete`.
@@ -2678,6 +2727,7 @@ The three cases a lexicographer meets most often, each naming the row of section
 |---|---|---|
 | `clear url on illustration[...]` | `Illustration.url`: scalar, required, identity (R1) | `CANNOT_CLEAR_IDENTITY_PROPERTY` |
 | `clear value on trait[...]` | `Trait.value`: scalar, required, non-identity (R3) | `CANNOT_CLEAR_REQUIRED_PROPERTY` |
+| `clear type on trait[...]` | `Trait.type`: read-only (section "4.5") | `PROPERTY_IS_READ_ONLY` |
 | `clear value on category of sense[...]` | `Category.value`: scalar, optional (R5) | the value is removed, or `UNSET_PROPERTY` if it was already unset |
 
 And the same for a required multitext, `Entry.form` (R4), where the outcome
@@ -2717,10 +2767,10 @@ on relation[type = "synonym", target = entry[form@tww = "moni"]]
 of entry[form@tww = "mami"]
 ```
 
-**The selector of a `relation`, a `variant` or a `reversal` must name its current
-target.** The natural identity property set of all three is `type + target`
-(section "4.1"), so strategy S3 requires both properties, and a command that
-rewrites a `target` has to say which link it is rewriting. Writing
+**The selector of a `relation` or a `variant` must name its current target.**
+The natural identity property set of both is `type + target` (section "4.1"), so
+strategy S3 requires both properties, and a command that rewrites a `target` has
+to say which link it is rewriting. Writing
 `on relation[type = "synonym"]` alone is `INCOMPLETE_SELECTOR`: `type` is half an
 identity key, and an entry may carry several `synonym` relations. Three spellings
 are available, and the second is usually the shortest:
@@ -2739,8 +2789,8 @@ create relation(type = "synonym", target = entry[form@tww = "moni"])
 set target = entry[form@tww = "memi"] on $link
 ```
 
-Note that `relation`, `variant` and `reversal` carry no `id` (section "5.3.1"
-gives one to `entry` and `sense` only), so strategy S2 is not available on them.
+Note that `relation` and `variant` carry no `id` (section "5.3.1" gives one to
+`entry` and `sense` only), so strategy S2 is not available on them.
 
 A relation to a sense may be written:
 
@@ -2783,10 +2833,10 @@ When a reference is **assigned**, the validator further verifies that:
 - the value resolves to exactly one existing component. This is the ordinary resolution of a chain (section "5.1.5"), so a chain matching nothing raises `NOT_FOUND` and one matching several raises `AMBIGUOUS_REFERENCE`; a reference target needs no error code of its own;
 - the component designated is an `entry` or a `sense`; otherwise `INVALID_TARGET` is raised. This is a **static** error, not a dynamic one: the component type is written in the step that designates it — the leftmost step of a LiftPatchRef chain, the last step of a LiftPatchShort path — or, for a label, is known from the command that bound it. `set target = example[text@tww = "a mami jefi"] of …` is rejected before the dictionary is consulted.
 
-These rules apply to the `target` property of the three component types that
-carry one: `variant`, `relation` and `reversal`. Since `type + target` is the
-natural identity of all three, two of them with the same type and the same target
-under one parent are duplicates, refused by the invariant of section "5.2" with
+These rules apply to the `target` property of the two component types that carry
+one: `variant` and `relation`. Since `type + target` is the natural identity of
+both, two of them with the same type and the same target under one parent are
+duplicates, refused by the invariant of section "5.2" with
 `CANNOT_CREATE_DUPLICATE`; nothing specific to references is involved.
 
 ## 11. Blocks
@@ -3348,7 +3398,6 @@ The properties on components are the same as in LIFT-DSL language, they are refe
 | Property | Concise LIFT-DSL |
 |---:|---|
 | `form` | f |
-| `morpheme` | m |
 | `definition` | d |
 | `gloss` | g |
 | `text` | t |
@@ -3583,10 +3632,10 @@ s /e[f="mami"]/r[y="synonym", a = /e[id="entry-42"]] (a = /memi)
   The path is resolved like any other path and must yield exactly one component. A label may be used instead: `(a = $newEntry)`. A bare string such as `(a = "entry-42")` is rejected with `REFERENCE_VALUE_MUST_BE_A_CHAIN`.
 
   Both lines above select the relation before rewriting its target, and neither
-  writes `r[y="synonym"]` alone: the natural identity of a `relation`, a `variant`
-  and a `reversal` is `type + target`, so a unique selector on one of them must
-  give both properties — or reach it by its ordinal, as the first line does (Part
-  2, section "10"). `r[y="synonym"]` on its own is `INCOMPLETE_SELECTOR`.
+  writes `r[y="synonym"]` alone: the natural identity of a `relation` and of a
+  `variant` is `type + target`, so a unique selector on one of them must give both
+  properties — or reach it by its ordinal, as the first line does (Part 2,
+  section "10"). `r[y="synonym"]` on its own is `INCOMPLETE_SELECTOR`.
 
   The same holds **inside a selector**, where a `reference` property is compared
   to a path and not to a quoted id (Part 2, section "10"):
@@ -4474,9 +4523,9 @@ argument beyond the number given for its type, raises
 | Media | 1 | url |
 | Etymology | 2 | type, form |
 | Annotation | 2 | type, value |
+| Reversal | 2 | type, form |
 | Relation | — | — |
 | Variant | — | — |
-| Reversal | — | — |
 | Category | — | — — a singleton is never created (Part 1, section "3.1") |
 
 The mapping is the required properties of the type, in a fixed order, which is
@@ -4489,9 +4538,9 @@ orders do differ — Appendix A writes `etymology`'s properties as `form, gloss,
 source, type`, while `c /… y("borrowing", "mami")` maps its two arguments to
 `type, form`.
 
-The three component types with no unnamed form are exactly the three whose
-required properties include a `reference`: `relation`, `variant` and `reversal`
-take a `type` and a `target`, and a target is a path, not a string (section "3"). Writing them out
+The two component types with no unnamed form are exactly the two whose required
+properties include a `reference`: `relation` and `variant` take a `type` and a
+`target`, and a target is a path, not a string (section "3"). Writing them out
 avoids a line in which a quoted string would mean a component:
 
 ```LiftPatchShort
@@ -4747,12 +4796,11 @@ the same shape with additional entries, under three conditions:
     "entry": {
       "componentKind": "ordered",
       "children": ["sense", "etymology", "variant", "relation", "pronunciation",
-                   "reversal", "trait", "annotation", "note", "field"],
+                   "trait", "annotation", "note", "field"],
       "naturalIdentity": [],
       "unnamedArguments": ["form"],
       "properties": {
-        "form":     { "datatype": "multitext", "qualifier": "object", "required": true },
-        "morpheme": { "datatype": "string",    "qualifier": null,     "required": false }
+        "form": { "datatype": "multitext", "qualifier": "object", "required": true }
       }
     },
     "sense": {
@@ -4783,7 +4831,7 @@ the same shape with additional entries, under three conditions:
       "properties": {
         "form":   { "datatype": "multitext", "qualifier": "object", "required": true },
         "gloss":  { "datatype": "multitext", "qualifier": "meta",   "required": false },
-        "source": { "datatype": "multitext", "qualifier": "meta",   "required": false },
+        "source": { "datatype": "string",    "qualifier": null,     "required": false },
         "type":   { "datatype": "string",    "qualifier": null,     "required": true }
       }
     },
@@ -4809,18 +4857,17 @@ the same shape with additional entries, under three conditions:
     },
     "reversal": {
       "componentKind": "ordered",
-      "children": ["trait", "annotation", "field"],
-      "naturalIdentity": ["type", "target"],
-      "unnamedArguments": [],
+      "children": ["reversal"],
+      "naturalIdentity": ["type", "form"],
+      "unnamedArguments": ["type", "form"],
       "properties": {
-        "form":   { "datatype": "multitext", "qualifier": "object", "required": false },
-        "type":   { "datatype": "string",    "qualifier": null,     "required": true },
-        "target": { "datatype": "reference", "qualifier": null,     "required": true }
+        "form": { "datatype": "multitext", "qualifier": "object", "required": true },
+        "type": { "datatype": "string",    "qualifier": null,     "required": true }
       }
     },
     "illustration": {
       "componentKind": "ordered",
-      "children": ["annotation", "field"],
+      "children": [],
       "naturalIdentity": ["url"],
       "unnamedArguments": ["url"],
       "properties": {
@@ -4830,7 +4877,7 @@ the same shape with additional entries, under three conditions:
     },
     "media": {
       "componentKind": "ordered",
-      "children": ["annotation", "field"],
+      "children": [],
       "naturalIdentity": ["url"],
       "unnamedArguments": ["url"],
       "properties": {
@@ -4849,11 +4896,11 @@ the same shape with additional entries, under three conditions:
     },
     "trait": {
       "componentKind": "typed",
-      "children": ["annotation", "field"],
+      "children": ["annotation"],
       "naturalIdentity": ["type"],
       "unnamedArguments": ["type", "value"],
       "properties": {
-        "type":  { "datatype": "string", "qualifier": null, "required": true },
+        "type":  { "datatype": "string", "qualifier": null, "required": true, "writable": false },
         "value": { "datatype": "string", "qualifier": null, "required": true }
       }
     },
@@ -4929,6 +4976,7 @@ Reading rules:
 - `componentKind` is the component kind of section "3.1", one of `"ordered"`, `"typed"` and `"singleton"`. It is the single declaration from which every rule about position, ordinals, type keys, the `at` clause and `move` is derived, and an implementation dispatches on it rather than on the component name. Two invariants tie it to the rest of the document and MUST hold of any metamodel, this one and any extension of it: a `"typed"` component type has `"naturalIdentity": ["type"]` and no other identity property, since the map key *is* the identity; and a `"singleton"` component type has an empty `naturalIdentity` and no `required` property, since it is never created and there is never a second one to distinguish it from.
 - `qualifier` gives the language kind of a multitext (`"object"` or `"meta"`) and is `null` for every scalar property. A property with a non-null `qualifier` is exactly a property that accepts an `@L` key and the `@*` wildcard.
 - `required` is *required at creation*: for a multitext, at least one qualified value.
+- `writable` is *writable after creation*, and defaults to `true` when it is absent, which it is for every property but one. A property declared `"writable": false` is a **read-only** property (section "4.5"): it is initialized at creation like any other and is refused as the target of a `set`, an `update` or a `clear` with `PROPERTY_IS_READ_ONLY`. An implementation dispatches on the flag rather than on the property name, so an extended metamodel may declare a read-only property of its own; it may not, however, make a property of this document writable that this document declares read-only, nor the reverse, since that would change what a script means rather than extend it.
 - `naturalIdentity` is the natural identity property set `I(T)` of section "5.2". An empty set — `entry` — means that the uniqueness invariant is vacuous for that type and that `create` never rejects it as a duplicate. When a multitext belongs to the set, values are compared language by language, and unset qualified values never take part in the comparison.
 - `unnamedArguments` is the ordered list of properties that the unnamed initializer arguments of LiftPatchShort map to, position by position (Part 3, section "6.2.4"). It is necessarily empty on a singleton component type, which has no initializer list at all because it is never created. It is declared explicitly, and is **not** derived from the order in which `properties` happens to be written: the order of the keys of a JSON object is not significant, so a derived rule would make the meaning of `c /mami f("editorial", "To be checked")` depend on a parser's hash table. An empty list means the component type admits no unnamed argument, and any unnamed argument given to it raises `UNNAMED_ARGUMENT_NOT_ALLOWED`; so does an argument beyond the length of the list. Every property listed here is a required property of its type.
 - `pseudoProperties` do not belong to the data: they are selection devices, and their availability per command is given by the applicability tables of section "5.4". `kind` says what sort of device each one is — `identifier` (a persistent id), `lookupKey` (a dictionary-assigned disambiguator), `position` (an ordinal), `key` (a type key, section "5.3.4"), `childPredicate` (a condition on the children of the component) — and is what an implementation dispatches on, rather than on the name. The singleton step of strategy S7 is not listed among the pseudo-properties because it is not one: it is the *absence* of a selector, and it is declared by the `componentKind` of the component type instead. A `childPredicate` is not a datatype-bearing property: `argument` gives what it is written with, a step for `has` and a string for `has-gloss`, and `expandsTo` gives the equivalent general form of the shorthand.
@@ -4954,6 +5002,7 @@ listed in B.4.
 | `UNKNOWN_PRAGMA_ATTRIBUTE` | the version pragma carries an attribute other than `sigil` and `metamodel` | 1.1 |
 | `UNSUPPORTED_METAMODEL` | the pragma requires a metamodel that the implementation has not loaded | 1.1, Appendix A |
 | `PROPERTY_DOES_NOT_EXIST_ON_COMPONENT_TYPE` | a property is used on a component type on which Appendix A does not define it | 4.1, 7.1 |
+| `PROPERTY_IS_READ_ONLY` | `set`, `update` or `clear` names a property that Appendix A declares `"writable": false`, such as the `type` of a `trait` | 4.5, 9.3.1 |
 | `ILLEGAL_PARENT` | two component types are stated to be parent and child where Appendix A does not relate them: a component created or moved under such a parent, a `create entry(...)` in a block body, or two adjacent steps of a chain or a path — which is what "skipping a level" amounts to, as in `on example[...] of entry[...]` or `d /e[f="mami"] x[t="…"]` | 3, 7.3, 8.5, 11 |
 | `LANG_KEY_NOT_SUPPORTED_ON_SCALAR` | an `@L` or `@*` qualifier, or a multi-language literal, is written on a scalar property | 4.4, 5.5.1 |
 | `MISSING_LANGUAGE_QUALIFIER` | `clear` is written on a multitext with neither a language code nor `@*` | 9.3.1 |
@@ -5154,7 +5203,7 @@ component-type    ::= 'entry' | 'sense' | 'example' | 'etymology' | 'variant'
                     | 'relation' | 'illustration' | 'media' | 'pronunciation'
                     | 'reversal' | 'trait' | 'annotation' | 'note' | 'field'
                     | 'translation' | 'category'
-property-name     ::= 'form' | 'morpheme' | 'gloss' | 'definition'
+property-name     ::= 'form' | 'gloss' | 'definition'
                     | 'text' | 'source' | 'target' | 'url' | 'label'
                     | 'transcription' | 'type' | 'value' | 'comment'
                     | 'when' | 'who'
@@ -5238,7 +5287,7 @@ label-ref         ::= '$' name
 property-ref      ::= property-code [ '@' ( lang | '*' ) ]
 component-code    ::= 'e' | 's' | 'x' | 'y' | 'v' | 'r' | 'i' | 'm' | 'p' | 'l'
                     | 't' | 'a' | 'n' | 'f' | 'o' | 'c' | component-type
-property-code     ::= 'f' | 'm' | 'd' | 'g' | 't' | 's' | 'a' | 'u' | 'l'
+property-code     ::= 'f' | 'd' | 'g' | 't' | 's' | 'a' | 'u' | 'l'
                     | 'r' | 'y' | 'v' | 'o' | 'w' | 'h' | property-name
 ```
 
@@ -5699,7 +5748,8 @@ implementation MAY add cases; it MUST pass these.
     "expect": { "status": "ok", "effects": [
       { "kind": "componentCreated", "componentType": "sense", "position": 2 },
       { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "puppy" },
-      { "kind": "componentCreated", "componentType": "note", "position": 1 },
+      { "kind": "componentCreated", "componentType": "note", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "general" },
       { "kind": "propertySet", "property": "text", "language": "en", "oldValue": null, "newValue": "checked" } ] } },
 
   { "id": "C-045", "section": "5.1.3", "syntax": "LiftPatchRef",
@@ -5949,7 +5999,44 @@ implementation MAY add cases; it MUST pass these.
     "description": "a singleton cannot be deleted in the concise syntax either",
     "dictionary": "standard",
     "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] c",
-    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } }
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-081", "section": "4.5", "syntax": "LiftPatchRef",
+    "description": "a read-only property may be initialized at creation and never written again",
+    "dictionary": "standard",
+    "script": "create trait(type = \"CVpattern\", value = \"CVC\") under entry[form@tww = \"memi\"]\nset value = \"CVCV\" on trait^CVpattern of entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "trait", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "CVpattern" },
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "CVC" },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "CVC", "newValue": "CVCV" } ] } },
+
+  { "id": "C-082", "section": "4.5", "syntax": "LiftPatchRef",
+    "description": "writing a read-only property is refused, and before the dictionary is consulted",
+    "dictionary": "standard",
+    "script": "create trait(type = \"CVpattern\", value = \"CVC\") under entry[form@tww = \"memi\"]\nset type = \"syllable\" on trait^CVpattern of entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "PROPERTY_IS_READ_ONLY", "kind": "static", "commandIndex": 2 } },
+
+  { "id": "C-083", "section": "4.5", "syntax": "LiftPatchRef",
+    "description": "the read-only check precedes the role of the property, so clear reports it rather than CANNOT_CLEAR_IDENTITY_PROPERTY",
+    "dictionary": "standard",
+    "script": "clear type on trait^CVpattern of entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "PROPERTY_IS_READ_ONLY", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-084", "section": "4.1", "syntax": "LiftPatchRef",
+    "description": "the natural identity of a reversal is its type and its form",
+    "dictionary": "standard",
+    "script": "create reversal(type = \"reversal\", form@tww = \"mami\") under sense[gloss@en = \"dog\"] of entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "reversal", "position": 1 },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "reversal" },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mami" } ] } },
+
+  { "id": "C-085", "section": "3", "syntax": "LiftPatchRef",
+    "description": "a reversal belongs to a sense and not to an entry",
+    "dictionary": "standard",
+    "script": "create reversal(type = \"reversal\", form@tww = \"mami\") under entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "ILLEGAL_PARENT", "kind": "static", "commandIndex": 1 } }
 ]
 ```
 

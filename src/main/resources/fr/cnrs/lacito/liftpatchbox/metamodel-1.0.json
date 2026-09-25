@@ -7,12 +7,11 @@
     "entry": {
       "componentKind": "ordered",
       "children": ["sense", "etymology", "variant", "relation", "pronunciation",
-                   "reversal", "trait", "annotation", "note", "field"],
+                   "trait", "annotation", "note", "field"],
       "naturalIdentity": [],
       "unnamedArguments": ["form"],
       "properties": {
-        "form":     { "datatype": "multitext", "qualifier": "object", "required": true },
-        "morpheme": { "datatype": "string",    "qualifier": null,     "required": false }
+        "form": { "datatype": "multitext", "qualifier": "object", "required": true }
       }
     },
     "sense": {
@@ -43,7 +42,7 @@
       "properties": {
         "form":   { "datatype": "multitext", "qualifier": "object", "required": true },
         "gloss":  { "datatype": "multitext", "qualifier": "meta",   "required": false },
-        "source": { "datatype": "multitext", "qualifier": "meta",   "required": false },
+        "source": { "datatype": "string",    "qualifier": null,     "required": false },
         "type":   { "datatype": "string",    "qualifier": null,     "required": true }
       }
     },
@@ -69,18 +68,17 @@
     },
     "reversal": {
       "componentKind": "ordered",
-      "children": ["trait", "annotation", "field"],
-      "naturalIdentity": ["type", "target"],
-      "unnamedArguments": [],
+      "children": ["reversal"],
+      "naturalIdentity": ["type", "form"],
+      "unnamedArguments": ["type", "form"],
       "properties": {
-        "form":   { "datatype": "multitext", "qualifier": "object", "required": false },
-        "type":   { "datatype": "string",    "qualifier": null,     "required": true },
-        "target": { "datatype": "reference", "qualifier": null,     "required": true }
+        "form": { "datatype": "multitext", "qualifier": "object", "required": true },
+        "type": { "datatype": "string",    "qualifier": null,     "required": true }
       }
     },
     "illustration": {
       "componentKind": "ordered",
-      "children": ["annotation", "field"],
+      "children": [],
       "naturalIdentity": ["url"],
       "unnamedArguments": ["url"],
       "properties": {
@@ -90,7 +88,7 @@
     },
     "media": {
       "componentKind": "ordered",
-      "children": ["annotation", "field"],
+      "children": [],
       "naturalIdentity": ["url"],
       "unnamedArguments": ["url"],
       "properties": {
@@ -109,11 +107,11 @@
     },
     "trait": {
       "componentKind": "typed",
-      "children": ["annotation", "field"],
+      "children": ["annotation"],
       "naturalIdentity": ["type"],
       "unnamedArguments": ["type", "value"],
       "properties": {
-        "type":  { "datatype": "string", "qualifier": null, "required": true },
+        "type":  { "datatype": "string", "qualifier": null, "required": true, "writable": false },
         "value": { "datatype": "string", "qualifier": null, "required": true }
       }
     },

@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.cnrs.lacito.liftpatchbox.error.ErrorCode;
+import fr.cnrs.lacito.liftpatchbox.error.ErrorKind;
+import fr.cnrs.lacito.liftpatchbox.error.LiftPatchError;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -297,6 +299,85 @@ class PropertyCommandsTest extends PatchTestSupport {
                   on sense[gloss@en = "pig"]
                   of entry[form@tww = "mami", hn = 1]
                 """);
+        }
+    }
+
+    @Nested
+    @DisplayName("read-only properties")
+    class ReadOnly {
+
+        /** A trait to write on: the standard fixture has none. */
+        private void aTrait() {
+            apply("create trait(type = \"CVpattern\", value = \"CVC\") "
+                + "under entry[form@tww = \"memi\"]");
+        }
+
+        @Test
+        @DisplayName("are initialized at creation like any other property")
+        void areInitializedAtCreation() {
+            assertEffects(
+                apply("create trait(type = \"CVpattern\", value = \"CVC\") "
+                    + "under entry[form@tww = \"memi\"]"),
+                "created:trait@null", "set:type=CVpattern", "set:value=CVC");
+        }
+
+        @Test
+        @DisplayName("are what a unique selector on the component is written with")
+        void selectTheComponent() {
+            aTrait();
+            assertEffects(
+                apply("set value = \"CVCV\" on trait^CVpattern of entry[form@tww = \"memi\"]"),
+                "replaced:value:CVC->CVCV");
+        }
+
+        @Test
+        @DisplayName("refuse set")
+        void refuseSet() {
+            aTrait();
+            refused(ErrorCode.PROPERTY_IS_READ_ONLY,
+                "set type = \"syllable\" on trait^CVpattern of entry[form@tww = \"memi\"]");
+        }
+
+        @Test
+        @DisplayName("refuse update")
+        void refuseUpdate() {
+            aTrait();
+            refused(ErrorCode.PROPERTY_IS_READ_ONLY,
+                "update type = \"syllable\" on trait^CVpattern of entry[form@tww = \"memi\"]");
+        }
+
+        @Test
+        @DisplayName("refuse clear, and report the read-only code rather than the identity one")
+        void refuseClear() {
+            aTrait();
+            refused(ErrorCode.PROPERTY_IS_READ_ONLY,
+                "clear type on trait^CVpattern of entry[form@tww = \"memi\"]");
+        }
+
+        @Test
+        @DisplayName("are refused before the dictionary is consulted")
+        void areRefusedStatically() {
+            // No trait exists, so a dynamic check would raise NOT_FOUND first.
+            LiftPatchError error = refused(ErrorCode.PROPERTY_IS_READ_ONLY,
+                "set type = \"syllable\" on trait^nothing of entry[form@tww = \"memi\"]");
+            assertTrue(error.kind() == ErrorKind.STATIC, "the check must be static");
+        }
+
+        @Test
+        @DisplayName("refuse the concise spelling too")
+        void refuseTheConciseSpelling() {
+            aTrait();
+            refusedConcise(ErrorCode.PROPERTY_IS_READ_ONLY,
+                "s /memi t^CVpattern (y = \"syllable\")");
+        }
+
+        @Test
+        @DisplayName("leave every other property of the component writable")
+        void leaveTheRestWritable() {
+            aTrait();
+            assertEffects(
+                applyConcise("s /memi t^CVpattern (v = \"CVCV\")"),
+                "replaced:value:CVC->CVCV");
         }
     }
 

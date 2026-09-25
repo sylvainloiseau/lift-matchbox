@@ -560,5 +560,42 @@
     "description": "a singleton cannot be deleted in the concise syntax either",
     "dictionary": "standard",
     "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] c",
-    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } }
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-081", "section": "4.5", "syntax": "LiftPatchRef",
+    "description": "a read-only property may be initialized at creation and never written again",
+    "dictionary": "standard",
+    "script": "create trait(type = \"CVpattern\", value = \"CVC\") under entry[form@tww = \"memi\"]\nset value = \"CVCV\" on trait^CVpattern of entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "trait", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "CVpattern" },
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "CVC" },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "CVC", "newValue": "CVCV" } ] } },
+
+  { "id": "C-082", "section": "4.5", "syntax": "LiftPatchRef",
+    "description": "writing a read-only property is refused, and before the dictionary is consulted",
+    "dictionary": "standard",
+    "script": "create trait(type = \"CVpattern\", value = \"CVC\") under entry[form@tww = \"memi\"]\nset type = \"syllable\" on trait^CVpattern of entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "PROPERTY_IS_READ_ONLY", "kind": "static", "commandIndex": 2 } },
+
+  { "id": "C-083", "section": "4.5", "syntax": "LiftPatchRef",
+    "description": "the read-only check precedes the role of the property, so clear reports it rather than CANNOT_CLEAR_IDENTITY_PROPERTY",
+    "dictionary": "standard",
+    "script": "clear type on trait^CVpattern of entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "PROPERTY_IS_READ_ONLY", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-084", "section": "4.1", "syntax": "LiftPatchRef",
+    "description": "the natural identity of a reversal is its type and its form",
+    "dictionary": "standard",
+    "script": "create reversal(type = \"reversal\", form@tww = \"mami\") under sense[gloss@en = \"dog\"] of entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "reversal", "position": 1 },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "reversal" },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mami" } ] } },
+
+  { "id": "C-085", "section": "3", "syntax": "LiftPatchRef",
+    "description": "a reversal belongs to a sense and not to an entry",
+    "dictionary": "standard",
+    "script": "create reversal(type = \"reversal\", form@tww = \"mami\") under entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "ILLEGAL_PARENT", "kind": "static", "commandIndex": 1 } }
 ]

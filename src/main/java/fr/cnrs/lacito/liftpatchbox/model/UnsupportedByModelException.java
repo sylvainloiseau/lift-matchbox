@@ -1,17 +1,19 @@
 package fr.cnrs.lacito.liftpatchbox.model;
 
 /**
- * Raised when a script asks for something the LiftPatch specification defines but
- * the underlying {@code lift-api} dictionary model cannot express.
+ * An internal guard: the model adapter was asked for a component type, a
+ * property or a parentage that the dictionary model has no home for.
  *
- * <p>This is never a defect of the script. The LIFT metamodel of Appendix A is
- * slightly wider than the object model this library writes through: a
- * {@code reversal} carries a {@code target} in the specification and not in the
- * dictionary model, a {@code trait} may hold a {@code field} in the specification
- * and not in the dictionary model, and the {@code url} of an
- * {@code illustration} is fixed when the component is built. Those gaps are
- * listed in the documentation of {@link LiftModel}, and each of them is reported
- * with this exception rather than silently ignored or silently approximated.</p>
+ * <p>No script can reach it. The metamodel of Appendix A and the dictionary model
+ * agree, and the static validator refuses every command that names a parentage or
+ * a property the metamodel does not declare, long before the adapter is called.
+ * This exception therefore reports a defect of this library — a metamodel and an
+ * adapter that have drifted apart — and not a defect of the script, which is why
+ * it carries no error code of Appendix B.</p>
+ *
+ * <p>It is a {@link RuntimeException} rather than an assertion so that it is
+ * reported with its message whatever the JVM's assertion settings, and it is kept
+ * rather than removed so that the drift is loud if it ever happens.</p>
  */
 public class UnsupportedByModelException extends RuntimeException {
 

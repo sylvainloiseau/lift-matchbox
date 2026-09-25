@@ -107,6 +107,33 @@ class ComponentCommandsTest extends PatchTestSupport {
         }
 
         @Test
+        @DisplayName("creates a reversal on a sense, whose identity is its type and its form")
+        void createsAReversalOnASense() {
+            assertEffects(
+                apply("create reversal(type = \"reversal\", form@tww = \"mami\") "
+                    + "under sense[gloss@en = \"dog\"] of entry[form@tww = \"memi\"]"),
+                "created:reversal@1", "set:type=reversal", "set:form@tww=mami");
+        }
+
+        @Test
+        @DisplayName("refuses a reversal on an entry, which holds none")
+        void refusesAReversalOnAnEntry() {
+            refused(ErrorCode.ILLEGAL_PARENT,
+                "create reversal(type = \"reversal\", form@tww = \"mami\") "
+                    + "under entry[form@tww = \"memi\"]");
+        }
+
+        @Test
+        @DisplayName("refuses two reversals with the same type and form under one sense")
+        void refusesADuplicateReversal() {
+            apply("create reversal(type = \"reversal\", form@tww = \"mami\") "
+                + "under sense[gloss@en = \"dog\"] of entry[form@tww = \"memi\"]");
+            refused(ErrorCode.CANNOT_CREATE_DUPLICATE,
+                "create reversal(type = \"reversal\", form@tww = \"mami\") "
+                    + "under sense[gloss@en = \"dog\"] of entry[form@tww = \"memi\"]");
+        }
+
+        @Test
         @DisplayName("refuses a missing required property")
         void refusesAMissingRequiredProperty() {
             refused(ErrorCode.MISSING_REQUIRED_PROPERTY,

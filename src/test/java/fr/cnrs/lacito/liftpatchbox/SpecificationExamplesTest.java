@@ -36,19 +36,38 @@ import org.junit.jupiter.api.TestFactory;
 class SpecificationExamplesTest {
 
     /**
-     * Examples the specification prints in order to show what is refused, keyed by
-     * the line of their opening fence, with the code each one is expected to raise.
+     * Examples the specification prints in order to show what is refused, each
+     * paired with the code it must raise.
+     *
+     * <p>They are keyed by a distinctive fragment of the script rather than by a
+     * line number: the specification is edited, and a key that moves with the text
+     * cannot silently turn a checked illegal example into an unchecked one.</p>
      */
-    private static final Map<Integer, ErrorCode> DELIBERATELY_ILLEGAL = Map.of(
+    private static final Map<String, ErrorCode> DELIBERATELY_ILLEGAL = Map.of(
         // 5.2: a sense selected on the strict axis by two qualified glosses.
-        869, ErrorCode.DUPLICATE_SELECTOR,
+        "gloss@en = \"pig\", gloss@fr = \"porc\"", ErrorCode.DUPLICATE_SELECTOR,
         // 5.3.2.2: an ambiguous entry that the child selector must not disambiguate.
-        1120, ErrorCode.AMBIGUOUS_REFERENCE,
+        "create example(\n  text@tww = \"a mami jefi\"\n)\nunder sense[\n  gloss@en = \"pig\"\n]\nof entry[\n  form@tww = \"mami\"\n]",
+        ErrorCode.AMBIGUOUS_REFERENCE,
         // 7.3.1: a unique selector carrying a predicate beyond its strategy.
-        1771, ErrorCode.PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR,
+        "definition@en = \"A four-legged terrestrial animal\"]", 
+        ErrorCode.PREDICATE_NOT_ALLOWED_IN_UNIQUE_SELECTOR,
         // Part 3, 5.6: the block's last line, annotated with the code it raises.
-        4210, ErrorCode.MISSING_LANGUAGE_QUALIFIER
+        "(d)       # MISSING_LANGUAGE_QUALIFIER", ErrorCode.MISSING_LANGUAGE_QUALIFIER
     );
+
+    /**
+     * The code an example is expected to raise, or {@code null} when it must be
+     * statically valid.
+     */
+    private static ErrorCode expectedFailure(SpecificationExamples.Example example) {
+        for (Map.Entry<String, ErrorCode> e : DELIBERATELY_ILLEGAL.entrySet()) {
+            if (example.script().contains(e.getKey())) {
+                return e.getValue();
+            }
+        }
+        return null;
+    }
 
     private final LiftPatchBox box = new LiftPatchBox()
         .withDefaultObjectLanguage("tww")
@@ -72,7 +91,7 @@ class SpecificationExamplesTest {
     }
 
     private void check(SpecificationExamples.Example example) {
-        ErrorCode expected = DELIBERATELY_ILLEGAL.get(example.line());
+        ErrorCode expected = expectedFailure(example);
 
         Script script;
         try {
