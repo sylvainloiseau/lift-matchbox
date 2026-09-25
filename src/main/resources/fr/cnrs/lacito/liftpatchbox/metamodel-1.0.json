@@ -1,0 +1,183 @@
+{
+  "liftpatchMetamodel": "1.0",
+  "languageKinds": ["object", "meta"],
+  "datatypes": ["string", "integer", "reference", "url", "multitext"],
+  "root": "dictionary",
+  "components": {
+    "entry": {
+      "componentKind": "ordered",
+      "children": ["sense", "etymology", "variant", "relation", "pronunciation",
+                   "reversal", "trait", "annotation", "note", "field"],
+      "naturalIdentity": [],
+      "unnamedArguments": ["form"],
+      "properties": {
+        "form":     { "datatype": "multitext", "qualifier": "object", "required": true },
+        "morpheme": { "datatype": "string",    "qualifier": null,     "required": false }
+      }
+    },
+    "sense": {
+      "componentKind": "ordered",
+      "children": ["sense", "example", "relation", "illustration", "reversal",
+                   "trait", "annotation", "note", "field", "category"],
+      "naturalIdentity": ["gloss"],
+      "unnamedArguments": ["gloss"],
+      "properties": {
+        "gloss":      { "datatype": "multitext", "qualifier": "meta", "required": true },
+        "definition": { "datatype": "multitext", "qualifier": "meta", "required": false }
+      }
+    },
+    "example": {
+      "componentKind": "ordered",
+      "children": ["translation", "trait", "annotation", "field"],
+      "naturalIdentity": ["text"],
+      "unnamedArguments": ["text"],
+      "properties": {
+        "text": { "datatype": "multitext", "qualifier": "object", "required": true }
+      }
+    },
+    "etymology": {
+      "componentKind": "ordered",
+      "children": ["trait", "annotation", "field"],
+      "naturalIdentity": ["type", "form"],
+      "unnamedArguments": ["type", "form"],
+      "properties": {
+        "form":   { "datatype": "multitext", "qualifier": "object", "required": true },
+        "gloss":  { "datatype": "multitext", "qualifier": "meta",   "required": false },
+        "source": { "datatype": "multitext", "qualifier": "meta",   "required": false },
+        "type":   { "datatype": "string",    "qualifier": null,     "required": true }
+      }
+    },
+    "variant": {
+      "componentKind": "ordered",
+      "children": ["pronunciation", "relation", "trait", "annotation", "field"],
+      "naturalIdentity": ["type", "target"],
+      "unnamedArguments": [],
+      "properties": {
+        "type":   { "datatype": "string",    "qualifier": null, "required": true },
+        "target": { "datatype": "reference", "qualifier": null, "required": true }
+      }
+    },
+    "relation": {
+      "componentKind": "ordered",
+      "children": ["trait", "annotation", "field"],
+      "naturalIdentity": ["type", "target"],
+      "unnamedArguments": [],
+      "properties": {
+        "type":   { "datatype": "string",    "qualifier": null, "required": true },
+        "target": { "datatype": "reference", "qualifier": null, "required": true }
+      }
+    },
+    "reversal": {
+      "componentKind": "ordered",
+      "children": ["trait", "annotation", "field"],
+      "naturalIdentity": ["type", "target"],
+      "unnamedArguments": [],
+      "properties": {
+        "form":   { "datatype": "multitext", "qualifier": "object", "required": false },
+        "type":   { "datatype": "string",    "qualifier": null,     "required": true },
+        "target": { "datatype": "reference", "qualifier": null,     "required": true }
+      }
+    },
+    "illustration": {
+      "componentKind": "ordered",
+      "children": ["annotation", "field"],
+      "naturalIdentity": ["url"],
+      "unnamedArguments": ["url"],
+      "properties": {
+        "url":   { "datatype": "url",       "qualifier": null,   "required": true },
+        "label": { "datatype": "multitext", "qualifier": "meta", "required": false }
+      }
+    },
+    "media": {
+      "componentKind": "ordered",
+      "children": ["annotation", "field"],
+      "naturalIdentity": ["url"],
+      "unnamedArguments": ["url"],
+      "properties": {
+        "url":   { "datatype": "url",       "qualifier": null,   "required": true },
+        "label": { "datatype": "multitext", "qualifier": "meta", "required": false }
+      }
+    },
+    "pronunciation": {
+      "componentKind": "ordered",
+      "children": ["media", "trait", "annotation", "field"],
+      "naturalIdentity": ["transcription"],
+      "unnamedArguments": ["transcription"],
+      "properties": {
+        "transcription": { "datatype": "multitext", "qualifier": "object", "required": true }
+      }
+    },
+    "trait": {
+      "componentKind": "typed",
+      "children": ["annotation", "field"],
+      "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "value"],
+      "properties": {
+        "type":  { "datatype": "string", "qualifier": null, "required": true },
+        "value": { "datatype": "string", "qualifier": null, "required": true }
+      }
+    },
+    "annotation": {
+      "componentKind": "ordered",
+      "children": [],
+      "naturalIdentity": ["type", "value"],
+      "unnamedArguments": ["type", "value"],
+      "properties": {
+        "type":    { "datatype": "string",    "qualifier": null,   "required": true },
+        "value":   { "datatype": "string",    "qualifier": null,   "required": true },
+        "comment": { "datatype": "multitext", "qualifier": "meta", "required": false },
+        "when":    { "datatype": "string",    "qualifier": null,   "required": false },
+        "who":     { "datatype": "string",    "qualifier": null,   "required": false }
+      }
+    },
+    "note": {
+      "componentKind": "typed",
+      "children": ["annotation"],
+      "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "text"],
+      "properties": {
+        "type": { "datatype": "string",    "qualifier": null,   "required": true },
+        "text": { "datatype": "multitext", "qualifier": "meta", "required": true }
+      }
+    },
+    "field": {
+      "componentKind": "typed",
+      "children": ["annotation"],
+      "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "text"],
+      "properties": {
+        "type": { "datatype": "string",    "qualifier": null,   "required": true },
+        "text": { "datatype": "multitext", "qualifier": "meta", "required": true }
+      }
+    },
+    "translation": {
+      "componentKind": "typed",
+      "children": [],
+      "naturalIdentity": ["type"],
+      "unnamedArguments": ["type", "text"],
+      "properties": {
+        "type": { "datatype": "string",    "qualifier": null,   "required": true },
+        "text": { "datatype": "multitext", "qualifier": "meta", "required": true }
+      }
+    },
+    "category": {
+      "componentKind": "singleton",
+      "children": ["trait"],
+      "naturalIdentity": [],
+      "unnamedArguments": [],
+      "properties": {
+        "value": { "datatype": "string", "qualifier": null, "required": false }
+      }
+    }
+  },
+  "pseudoProperties": {
+    "id":        { "kind": "identifier",     "datatype": "string",  "scope": "entry and sense only" },
+    "hn":        { "kind": "lookupKey",      "datatype": "integer", "scope": "entry only" },
+    "ordinal":   { "kind": "position",       "datatype": "integer", "scope": "ordered component types except entry" },
+    "typeKey":   { "kind": "key",            "datatype": "string",  "scope": "typed component types",
+                   "expandsTo": "[type = V]" },
+    "has":       { "kind": "childPredicate", "argument": "step",    "scope": "every component type" },
+    "has-gloss": { "kind": "childPredicate", "argument": "string", "qualifier": "meta",
+                   "scope": "entry only", "expandsTo": "has sense[gloss@L = V]" }
+  }
+}

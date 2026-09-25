@@ -1,0 +1,39 @@
+{
+  "fixture": "standard",
+  "objectLanguages": ["tww", "tpi"],
+  "metaLanguages": ["en", "fr"],
+  "entries": [
+    {
+      "id": "e-1", "hn": 1,
+      "form": { "tww": "mami", "tpi": "pik" },
+      "senses": [
+        {
+          "id": "s-1",
+          "gloss": { "en": "pig", "fr": "cochon" },
+          "definition": { "en": "A four-legged terrestrial animal" },
+          "category": { "value": "Noun" },
+          "examples": [
+            { "text": { "tww": "a mami jefi" },
+              "translations": [ { "type": "free", "text": { "en": "I shot a pig" } } ] },
+            { "text": { "tww": "a mami jefo" } }
+          ]
+        },
+        { "id": "s-2", "gloss": { "en": "pork" }, "category": { "value": "Noun" } }
+      ]
+    },
+    {
+      "id": "e-2", "hn": 2,
+      "form": { "tww": "mami" },
+      "senses": [
+        { "id": "s-3", "gloss": { "en": "taro" } },
+        { "id": "s-5", "gloss": { "en": "pig" } }
+      ]
+    },
+    {
+      "id": "e-3", "hn": 1,
+      "form": { "tww": "memi" },
+      "senses": [ { "id": "s-4", "gloss": { "en": "dog" } } ],
+      "relations": [ { "type": "synonym", "target": "e-1" } ]
+    }
+  ]
+}

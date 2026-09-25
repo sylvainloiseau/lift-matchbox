@@ -1,0 +1,564 @@
+[
+  { "id": "C-001", "section": "8.1", "syntax": "LiftPatchRef",
+    "description": "create a sense under an unambiguous entry",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"puppy\") under entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "puppy" } ] } },
+
+  { "id": "C-002", "section": "5.3.2", "syntax": "LiftPatchRef",
+    "description": "a form shared by two entries is ambiguous, and is never silently resolved",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"piglet\") under entry[form@tww = \"mami\"]",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-003", "section": "5.3.2.2", "syntax": "LiftPatchRef",
+    "description": "has-gloss disambiguates the homophones",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"piglet\") under entry[form@tww = \"mami\", has-gloss@en = \"taro\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 3 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "piglet" } ] } },
+
+  { "id": "C-004", "section": "7.3", "syntax": "LiftPatchRef",
+    "description": "a within chain resolves through an ambiguous ancestor",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"taro\"]\n  within entry[form@tww = \"mami\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "Verb" } ] } },
+
+  { "id": "C-005", "section": "7.3", "syntax": "LiftPatchRef",
+    "description": "a within chain that leaves two candidate paths fails",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"pig\"]\n  within entry[form@tww = \"mami\"]",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-006", "section": "5.2", "syntax": "LiftPatchRef",
+    "description": "two senses under one entry may not share a qualified gloss",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"pork\") under entry[form@tww = \"memi\", has-gloss@en = \"dog\"]\ncreate sense(gloss@en = \"pork\") under entry[form@tww = \"memi\", has-gloss@en = \"dog\"]",
+    "expect": { "status": "error", "code": "CANNOT_CREATE_DUPLICATE", "kind": "dynamic", "commandIndex": 2 } },
+
+  { "id": "C-007", "section": "8.1.1", "syntax": "LiftPatchRef",
+    "description": "entry has an empty natural identity: a third homophone is legal",
+    "dictionary": "standard",
+    "script": "create entry(form@tww = \"mami\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mami" } ] } },
+
+  { "id": "C-008", "section": "9.3.1", "syntax": "LiftPatchRef",
+    "description": "clearing the only qualified value of a required multitext is refused",
+    "dictionary": "standard",
+    "script": "clear gloss@en on sense[gloss@en = \"taro\"] of entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "error", "code": "CANNOT_CLEAR_REQUIRED_MULTITEXT", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-009", "section": "9.3.1", "syntax": "LiftPatchRef",
+    "description": "clearing one qualified value of a required multitext is legal when another remains",
+    "dictionary": "standard",
+    "script": "clear gloss@fr on sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyRemoved", "property": "gloss", "language": "fr", "oldValue": "cochon", "newValue": null } ] } },
+
+  { "id": "C-010", "section": "5.5.3", "syntax": "LiftPatchRef",
+    "description": "clear on a multitext requires an explicit qualifier",
+    "dictionary": "standard",
+    "script": "clear definition on sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "MISSING_LANGUAGE_QUALIFIER", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-011", "section": "9.2", "syntax": "LiftPatchRef",
+    "description": "update tests the qualified value, not the property",
+    "dictionary": "standard",
+    "script": "update definition@fr = \"Un animal\" on sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "UNSET_QUALIFIED_PROPERTY", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-012", "section": "8.2.1", "syntax": "LiftPatchRef",
+    "description": "upsert select branch: the sense exists, only the assignment part applies",
+    "dictionary": "standard",
+    "script": "upsert sense(gloss@en = \"taro\", definition@en = \"An edible root\") under entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "definition", "language": "en", "oldValue": null, "newValue": "An edible root" } ] } },
+
+  { "id": "C-013", "section": "8.2.1", "syntax": "LiftPatchRef",
+    "description": "upsert create branch: the sense does not exist",
+    "dictionary": "standard",
+    "script": "upsert sense(gloss@en = \"yam\", definition@en = \"An edible root\") under entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 3 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "yam" },
+      { "kind": "propertySet", "property": "definition", "language": "en", "oldValue": null, "newValue": "An edible root" } ] } },
+
+  { "id": "C-014", "section": "8.2.3", "syntax": "LiftPatchRef",
+    "description": "upsert on an entry needs a disambiguation predicate",
+    "dictionary": "standard",
+    "script": "upsert entry(form@tww = \"mami\")",
+    "expect": { "status": "error", "code": "UPSERT_ENTRY_WITHOUT_DISAMBIGUATION", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-015", "section": "6.2.1", "syntax": "LiftPatchRef",
+    "description": "at after places the component relative to a named sibling",
+    "dictionary": "standard",
+    "script": "create example(text@tww = \"a mami jefu\")\n  under sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]\n  at after example[text@tww = \"a mami jefi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "example", "position": 2 },
+      { "kind": "propertySet", "property": "text", "language": "tww", "oldValue": null, "newValue": "a mami jefu" } ] } },
+
+  { "id": "C-016", "section": "6.2", "syntax": "LiftPatchRef",
+    "description": "an entry takes no at clause",
+    "dictionary": "standard",
+    "script": "create entry(form@tww = \"mimi\") at beginning",
+    "expect": { "status": "error", "code": "SYNTAX_ERROR", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-017", "section": "11", "syntax": "LiftPatchRef",
+    "description": "move is not allowed in a block body",
+    "dictionary": "standard",
+    "script": "sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1] {\n  move example#1 at end\n}",
+    "expect": { "status": "error", "code": "MOVE_NOT_ALLOWED_IN_BLOCK", "kind": "static", "commandIndex": 2 } },
+
+  { "id": "C-018", "section": "10", "syntax": "LiftPatchRef",
+    "description": "a reference property is compared to a chain in a selector",
+    "dictionary": "standard",
+    "script": "set type = \"see-also\"\n  on relation[type = \"synonym\", target = entry[form@tww = \"mami\", hn = 1]]\n  of entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "type", "language": null, "oldValue": "synonym", "newValue": "see-also" } ] } },
+
+  { "id": "C-019", "section": "10", "syntax": "LiftPatchRef",
+    "description": "a bare string is not a reference value, in a selector either",
+    "dictionary": "standard",
+    "script": "set type = \"see-also\" on relation[type = \"synonym\", target = \"e-1\"] of entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "REFERENCE_VALUE_MUST_BE_A_CHAIN", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-020", "section": "3", "syntax": "LiftPatchRef",
+    "description": "illegal parentage is refused: an example has no note child",
+    "dictionary": "standard",
+    "script": "create note(type = \"x\", text@en = \"y\")\n  under example[text@tww = \"a mami jefi\"]\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "ILLEGAL_PARENT", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-021", "section": "9.1.1", "syntax": "LiftPatchRef",
+    "description": "an assignment list is the sequence of its assignments, applied to one resolved parent",
+    "dictionary": "standard",
+    "script": "set definition@en = \"A pig\", definition@fr = \"Un animal\"\n  on sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "definition", "language": "en", "oldValue": "A four-legged terrestrial animal", "newValue": "A pig" },
+      { "kind": "propertySet", "property": "definition", "language": "fr", "oldValue": null, "newValue": "Un animal" } ] } },
+
+  { "id": "C-022", "section": "5.6", "syntax": "LiftPatchRef",
+    "description": "delete all applies a filtering predicate to the target step",
+    "dictionary": "standard",
+    "script": "delete all example[text@tww ~ \"jef\"]\n  under sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentDeleted", "componentType": "example", "position": 1 },
+      { "kind": "componentDeleted", "componentType": "example", "position": 2 } ] } },
+
+  { "id": "C-023", "section": "12.2", "syntax": "LiftPatchRef",
+    "description": "a script is atomic: a failing second command undoes the first",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"puppy\") under entry[form@tww = \"memi\"]\ncreate sense(gloss@en = \"piglet\") under entry[form@tww = \"mami\"]",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 2 } },
+
+  { "id": "C-024", "section": "12.4.2", "syntax": "LiftPatchRef",
+    "description": "deleting a referenced entry is legal and reported as a dangling reference",
+    "dictionary": "standard",
+    "script": "delete entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok",
+      "effects": [ { "kind": "componentDeleted", "componentType": "entry", "position": null } ],
+      "danglingReferences": [
+        { "component": { "componentType": "relation", "id": null }, "property": "target", "value": "e-1" } ] } },
+
+  { "id": "C-025", "section": "Part 3, 1.1", "syntax": "LiftPatchShort",
+    "description": "a prose line that starts with a command letter is prose, not a command",
+    "dictionary": "standard",
+    "script": "c est une erreur fréquente\ne e[f=\"pig\"] is prose too, since a bare step is not a path\nc /memi/puppy",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "puppy" } ] } },
+
+  { "id": "C-026", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
+    "description": "in a property command every path link is existential",
+    "dictionary": "standard",
+    "script": "s /e[f=\"mami\"]/s[g=\"taro\"]/c (v = \"Noun\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+
+  { "id": "C-027", "section": "Part 3, 3", "syntax": "LiftPatchShort",
+    "description": "the link between the path and the target is strict, so the homophones are ambiguous",
+    "dictionary": "standard",
+    "script": "d /e[f=\"mami\"] s[g=\"taro\"]",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-028", "section": "Part 3, 8", "syntax": "LiftPatchShort",
+    "description": "the idiomatic upsert creates the entry and the sense when no match exists",
+    "dictionary": "standard",
+    "script": "p /mimi/lizard",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mimi" },
+      { "kind": "componentCreated", "componentType": "sense", "position": 1 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" } ] } },
+
+  { "id": "C-029", "section": "8.3", "syntax": "LiftPatchRef",
+    "description": "ensure succeeds and changes nothing",
+    "dictionary": "standard",
+    "script": "ensure sense[gloss@en = \"taro\"] under entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [] } },
+
+  { "id": "C-030", "section": "5.3.2.1", "syntax": "LiftPatchRef",
+    "description": "an hn that matches nothing is NOT_FOUND, not a code of its own",
+    "dictionary": "standard",
+    "script": "ensure entry[form@tww = \"mami\", hn = 7]",
+    "expect": { "status": "error", "code": "NOT_FOUND", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-031", "section": "5.4.2", "syntax": "LiftPatchRef",
+    "description": "an ordinal is allowed as the step of an on clause, and forbidden as a property",
+    "dictionary": "standard",
+    "script": "set text@tpi = \"mi shutim pik\"\n  on example#1\n  within sense[has category[value = \"Noun\"]]\n  within entry[form@tww = \"mami\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "text", "language": "tpi", "oldValue": null, "newValue": "mi shutim pik" } ] } },
+
+  { "id": "C-032", "section": "6.3", "syntax": "LiftPatchRef",
+    "description": "ensure binds a label, which a later command uses as a step",
+    "dictionary": "standard",
+    "script": "ensure entry[form@tww = \"memi\"] as $memi\ncreate sense(gloss@en = \"puppy\") under $memi",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "puppy" } ] } },
+
+  { "id": "C-033", "section": "Part 3, 8", "syntax": "LiftPatchShort",
+    "description": "the idiomatic upsert takes its select branch and changes nothing when the pair exists",
+    "dictionary": "standard",
+    "script": "p /mami/taro",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [] } },
+
+  { "id": "C-034", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "a same-parent move reports one componentMoved with both positions",
+    "dictionary": "standard",
+    "script": "move example#1\n  under sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]\n  at end",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 2 } ] } },
+
+  { "id": "C-035", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "moving to the position already occupied is refused",
+    "dictionary": "standard",
+    "script": "move example#1\n  under sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]\n  at beginning",
+    "expect": { "status": "error", "code": "MOVING_TO_CURRENT_POSITION", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-036", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "a move may not make a component its own ancestor",
+    "dictionary": "standard",
+    "script": "move sense[gloss@en = \"pig\"]\n  under entry[form@tww = \"mami\", hn = 1]\n  under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  at end",
+    "expect": { "status": "error", "code": "SELF_ANCESTOR", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-037", "section": "5.6", "syntax": "LiftPatchRef",
+    "description": "each applies the assignment to every matched component, in document order",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on each category\n  of sense[exists(gloss@en)]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-038", "section": "5.6", "syntax": "LiftPatchRef",
+    "description": "a marked step matching nothing succeeds, changes nothing, and warns",
+    "dictionary": "standard",
+    "script": "delete all example[text@tww ~ \"^draft\"]\n  under sense[gloss@en = \"pork\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [],
+      "warnings": [ { "code": "COMMAND_APPLIES_TO_NO_COMPONENT" } ] } },
+
+  { "id": "C-039", "section": "5.5.1", "syntax": "LiftPatchRef",
+    "description": "a multi-language literal is the sequence of its qualified assignments",
+    "dictionary": "standard",
+    "script": "set definition = { en: \"A pig\", fr: \"Un cochon\" }\n  on sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "definition", "language": "en", "oldValue": "A four-legged terrestrial animal", "newValue": "A pig" },
+      { "kind": "propertySet", "property": "definition", "language": "fr", "oldValue": null, "newValue": "Un cochon" } ] } },
+
+  { "id": "C-040", "section": "9.3.1", "syntax": "LiftPatchRef",
+    "description": "clear @* on an optional multitext removes one effect per language actually removed",
+    "dictionary": "standard",
+    "script": "clear definition@*\n  on sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyRemoved", "property": "definition", "language": "en", "oldValue": "A four-legged terrestrial animal", "newValue": null } ] } },
+
+  { "id": "C-041", "section": "2.1.1", "syntax": "LiftPatchRef",
+    "description": "language-default changes which language an unqualified assignment writes",
+    "dictionary": "standard",
+    "script": "language-default meta = \"fr\"\ncreate sense(gloss = \"chiot\") under entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "fr", "oldValue": null, "newValue": "chiot" } ] } },
+
+  { "id": "C-042", "section": "2.1.3", "syntax": "LiftPatchRef",
+    "description": "language-create is an operation, and is rolled back with the rest of a failing script",
+    "dictionary": "standard",
+    "script": "language-create object = \"hui\"\ncreate entry(form@hui = \"mami\")\ncreate sense(gloss@en = \"piglet\") under entry[form@tww = \"mami\"]",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 3 } },
+
+  { "id": "C-043", "section": "2.1.2", "syntax": "LiftPatchRef",
+    "description": "a with header binds defaults for its body and is not an operation",
+    "dictionary": "standard",
+    "script": "with object = \"tpi\", meta = \"fr\" {\n  create entry(form = \"pikpik\") as $m\n  create sense(gloss = \"lezard\") under $m\n}",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tpi", "oldValue": null, "newValue": "pikpik" },
+      { "kind": "componentCreated", "componentType": "sense", "position": 1 },
+      { "kind": "propertySet", "property": "gloss", "language": "fr", "oldValue": null, "newValue": "lezard" } ] } },
+
+  { "id": "C-044", "section": "11", "syntax": "LiftPatchRef",
+    "description": "a block header is an operation and may bind a label visible after the block",
+    "dictionary": "standard",
+    "script": "entry[form@tww = \"memi\"] as $memi {\n  create sense(gloss@en = \"puppy\")\n}\ncreate note(type = \"general\", text@en = \"checked\") under $memi",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "sense", "position": 2 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "puppy" },
+      { "kind": "componentCreated", "componentType": "note", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "general" },
+      { "kind": "propertySet", "property": "text", "language": "en", "oldValue": null, "newValue": "checked" } ] } },
+
+  { "id": "C-045", "section": "5.1.3", "syntax": "LiftPatchRef",
+    "description": "a has predicate refines strategy S3 on a component type that is not an entry",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"pig\", has example[text@tww = \"a mami jefo\"]]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-046", "section": "7.3", "syntax": "LiftPatchRef",
+    "description": "a chain that does not reach the root is refused before any lookup",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\" on category of sense[gloss@en = \"pig\"]",
+    "expect": { "status": "error", "code": "INCOMPLETE_ANCESTOR_CHAIN", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-047", "section": "7.2", "syntax": "LiftPatchRef",
+    "description": "a component command other than one targeting an entry needs a parent clause",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"piglet\")",
+    "expect": { "status": "error", "code": "MISSING_PARENT_CLAUSE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-048", "section": "5.1.2", "syntax": "LiftPatchRef",
+    "description": "a regular-expression operator does not apply to a reference property",
+    "dictionary": "standard",
+    "script": "delete all relation[target ~ entry[form@tww = \"mami\", hn = 1]] under entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "OPERATOR_NOT_APPLICABLE_TO_DATATYPE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-049", "section": "10", "syntax": "LiftPatchRef",
+    "description": "a reference target that is neither an entry nor a sense is a static error",
+    "dictionary": "standard",
+    "script": "set target = example[text@tww = \"a mami jefi\"] of sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  on relation#1\n  of entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "INVALID_TARGET", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-050", "section": "5.3.2.2", "syntax": "LiftPatchRef",
+    "description": "has-gloss is not admitted in a create initializer",
+    "dictionary": "standard",
+    "script": "create entry(form@tww = \"mimi\", has-gloss@en = \"pig\")",
+    "expect": { "status": "error", "code": "COMMAND_NOT_ALLOWING_HAS", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-051", "section": "5.3.2.1", "syntax": "LiftPatchRef",
+    "description": "hn may not be used without a form",
+    "dictionary": "standard",
+    "script": "delete entry[hn = 1]",
+    "expect": { "status": "error", "code": "HN_CANNOT_BE_USED_ALONE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-052", "section": "Part 3, 3.3", "syntax": "LiftPatchShort",
+    "description": "an indented block anchors its commands to the component of the line above",
+    "dictionary": "standard",
+    "script": "c e(\"mimi\")\n  c s(\"lizard\")\n    s (d@en = \"A lizard\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mimi" },
+      { "kind": "componentCreated", "componentType": "sense", "position": 1 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" },
+      { "kind": "propertySet", "property": "definition", "language": "en", "oldValue": null, "newValue": "A lizard" } ] } },
+
+  { "id": "C-053", "section": "Part 3, 8", "syntax": "LiftPatchShort",
+    "description": "the idiomatic upsert extends to the third abbreviated step, the example text",
+    "dictionary": "standard",
+    "script": "p /mimi/lizard/\"a mimi jefi\"",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "tww", "oldValue": null, "newValue": "mimi" },
+      { "kind": "componentCreated", "componentType": "sense", "position": 1 },
+      { "kind": "propertySet", "property": "gloss", "language": "en", "oldValue": null, "newValue": "lizard" },
+      { "kind": "componentCreated", "componentType": "example", "position": 1 },
+      { "kind": "propertySet", "property": "text", "language": "tww", "oldValue": null, "newValue": "a mimi jefi" } ] } },
+
+  { "id": "C-054", "section": "Part 3, 3", "syntax": "LiftPatchShort",
+    "description": "a path-only create or upsert needs abbreviated steps",
+    "dictionary": "standard",
+    "script": "p /e[f=\"mami\"]/s[g=\"pig\"]",
+    "expect": { "status": "error", "code": "CONSTRUCTOR_REQUIRED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-055", "section": "Part 3, 6.1", "syntax": "LiftPatchShort",
+    "description": "there is no abbreviated step below the third depth",
+    "dictionary": "standard",
+    "script": "d /mami/pig/\"a mami jefi\" foo",
+    "expect": { "status": "error", "code": "ABBREVIATED_STEP_NOT_ALLOWED_HERE", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-056", "section": "1.1", "syntax": "LiftPatchShort",
+    "description": "a reference-syntax script read as a concise document applies nothing, and says so",
+    "dictionary": "standard",
+    "script": "create sense(gloss@en = \"puppy\") under entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [],
+      "warnings": [ { "code": "NO_COMMAND_RECOGNIZED" } ] } },
+
+  { "id": "C-057", "section": "2.1.3", "syntax": "LiftPatchRef",
+    "description": "language-create is an operation and carries a languageCreated effect",
+    "dictionary": "standard",
+    "script": "language-create object = \"hui\"\ncreate entry(form@hui = \"mimi\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "languageCreated", "languageKind": "object", "language": "hui" },
+      { "kind": "componentCreated", "componentType": "entry", "position": null },
+      { "kind": "propertySet", "property": "form", "language": "hui", "oldValue": null, "newValue": "mimi" } ] } },
+
+  { "id": "C-058", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "a move to another parent reports one componentMoved with both positions",
+    "dictionary": "standard",
+    "script": "move example#1\n  under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  under sense[gloss@en = \"pork\"] of entry[form@tww = \"mami\", hn = 1]\n  at end",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 1 } ] } },
+
+  { "id": "C-059", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
+    "description": "every written link of a parent path is existential, so a path over two homophones that both carry the sense is ambiguous",
+    "dictionary": "standard",
+    "script": "d /mami/pig x#1",
+    "expect": { "status": "error", "code": "AMBIGUOUS_REFERENCE", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-060", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
+    "description": "the strict axis is written ! on any link, and makes the step above it a unique selector, which is what admits hn",
+    "dictionary": "standard",
+    "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] x#1",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentDeleted", "componentType": "example", "position": 1 } ] } },
+
+  { "id": "C-061", "section": "Part 3, 4.1", "syntax": "LiftPatchShort",
+    "description": "the direct target of a delete is exactly one step, written after the parent path",
+    "dictionary": "standard",
+    "script": "d /mami/pig",
+    "expect": { "status": "error", "code": "TARGET_MUST_BE_A_SINGLE_STEP", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-062", "section": "Part 3, 3.1", "syntax": "LiftPatchShort",
+    "description": "ensure with a separated target step succeeds and changes nothing",
+    "dictionary": "standard",
+    "script": "e /memi dog",
+    "expect": { "status": "ok", "rerun": "noEffect", "effects": [] } },
+
+  { "id": "C-063", "section": "Part 3, 5.3", "syntax": "LiftPatchShort",
+    "description": "a concise move with a to clause reports one componentMoved with both positions, as C-058 does in the reference syntax",
+    "dictionary": "standard",
+    "script": "m /e[f=\"mami\", hn=1]!s[g=\"pig\"] x#1 to /e[f=\"mami\", hn=1]!s[g=\"pork\"] at end",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentMoved", "componentType": "example", "fromPosition": 1, "toPosition": 1 } ] } },
+
+  { "id": "C-064", "section": "3.1", "syntax": "LiftPatchRef",
+    "description": "a singleton is written on with a property command and needs no selector",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on category\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-065", "section": "3.1", "syntax": "LiftPatchRef",
+    "description": "a singleton always exists, so its value may be set on a sense the fixture gives none for",
+    "dictionary": "standard",
+    "script": "set value = \"Noun\"\n  on category\n  of sense[gloss@en = \"taro\"]\n  of entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "value", "language": null, "oldValue": null, "newValue": "Noun" } ] } },
+
+  { "id": "C-066", "section": "3.1", "syntax": "LiftPatchRef",
+    "description": "a singleton cannot be created",
+    "dictionary": "standard",
+    "script": "create category(value = \"Noun\") under sense[gloss@en = \"taro\"] of entry[form@tww = \"mami\", hn = 2]",
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-067", "section": "8.4", "syntax": "LiftPatchRef",
+    "description": "a singleton cannot be deleted",
+    "dictionary": "standard",
+    "script": "delete category under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-068", "section": "5.1.3", "syntax": "LiftPatchRef",
+    "description": "a singleton takes no selector in a unique position",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on category[value = \"Noun\"]\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "SINGLETON_TAKES_NO_SELECTOR", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-069", "section": "5.1.4", "syntax": "LiftPatchRef",
+    "description": "a singleton step inside a has predicate is a filtering step and may carry a predicate list",
+    "dictionary": "standard",
+    "script": "set definition@fr = \"Un animal\"\n  on sense[gloss@en = \"pig\", has category[value = \"Noun\"]]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertySet", "property": "definition", "language": "fr", "oldValue": null, "newValue": "Un animal" } ] } },
+
+  { "id": "C-070", "section": "5.6", "syntax": "LiftPatchRef",
+    "description": "a marked singleton step distributes over its hosts, which become the filtering step",
+    "dictionary": "standard",
+    "script": "set value = \"Verb\"\n  on each category\n  of sense[exists(gloss@en)]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" },
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-071", "section": "5.3.4", "syntax": "LiftPatchRef",
+    "description": "a typed component is selected by its type key",
+    "dictionary": "standard",
+    "script": "create note(type = \"general\", text@en = \"recorded at Yakoro\") under entry[form@tww = \"memi\"]\nset text@en = \"recorded at Yakoro, 2025\" on note^general of entry[form@tww = \"memi\"]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "note", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "general" },
+      { "kind": "propertySet", "property": "text", "language": "en", "oldValue": null, "newValue": "recorded at Yakoro" },
+      { "kind": "propertyReplaced", "property": "text", "language": "en", "oldValue": "recorded at Yakoro", "newValue": "recorded at Yakoro, 2025" } ] } },
+
+  { "id": "C-072", "section": "5.3.4", "syntax": "LiftPatchRef",
+    "description": "a type key that matches no sibling is NOT_FOUND, like any other selector that matched nothing",
+    "dictionary": "standard",
+    "script": "delete note^general under entry[form@tww = \"memi\"]",
+    "expect": { "status": "error", "code": "NOT_FOUND", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-073", "section": "5.3.4", "syntax": "LiftPatchRef",
+    "description": "a type key on a component type that is not typed is rejected statically",
+    "dictionary": "standard",
+    "script": "delete example^free under sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_TYPED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-074", "section": "5.3.3", "syntax": "LiftPatchRef",
+    "description": "an ordinal on a typed component type is rejected statically: a map has no first element",
+    "dictionary": "standard",
+    "script": "delete translation#1 under example#1 of sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_ORDERED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-075", "section": "8.5", "syntax": "LiftPatchRef",
+    "description": "move applies to ordered components only",
+    "dictionary": "standard",
+    "script": "move translation[type = \"free\"]\n  under example#1 of sense[gloss@en = \"pig\"] of entry[form@tww = \"mami\", hn = 1]\n  at beginning",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_ORDERED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-076", "section": "6.2", "syntax": "LiftPatchRef",
+    "description": "an at clause on a typed component is rejected statically",
+    "dictionary": "standard",
+    "script": "create note(type = \"general\", text@en = \"…\") under entry[form@tww = \"memi\"] at beginning",
+    "expect": { "status": "error", "code": "COMPONENT_NOT_ORDERED", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-077", "section": "Part 3, 4.2.1", "syntax": "LiftPatchShort",
+    "description": "the concise syntax writes the type key and the singleton step the same way",
+    "dictionary": "standard",
+    "script": "s /e[f=\"mami\", hn=1]!s[g=\"pig\"]/c (v = \"Verb\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "value", "language": null, "oldValue": "Noun", "newValue": "Verb" } ] } },
+
+  { "id": "C-078", "section": "Part 3, 4.2.1", "syntax": "LiftPatchShort",
+    "description": "a concise type key selects a typed component",
+    "dictionary": "standard",
+    "script": "c /memi n(y=\"general\", t@en = \"recorded at Yakoro\")\nu /memi n^general (t@en = \"recorded at Yakoro, 2025\")",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "componentCreated", "componentType": "note", "position": null },
+      { "kind": "propertySet", "property": "type", "language": null, "oldValue": null, "newValue": "general" },
+      { "kind": "propertySet", "property": "text", "language": "en", "oldValue": null, "newValue": "recorded at Yakoro" },
+      { "kind": "propertyReplaced", "property": "text", "language": "en", "oldValue": "recorded at Yakoro", "newValue": "recorded at Yakoro, 2025" } ] } },
+
+  { "id": "C-079", "section": "Part 3, 2", "syntax": "LiftPatchShort",
+    "description": "a quoted step is always an abbreviated step, a bare singleton name never is",
+    "dictionary": "standard",
+    "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] \"c\"",
+    "expect": { "status": "error", "code": "NOT_FOUND", "kind": "dynamic", "commandIndex": 1 } },
+
+  { "id": "C-080", "section": "Part 3, 4.2.1", "syntax": "LiftPatchShort",
+    "description": "a singleton cannot be deleted in the concise syntax either",
+    "dictionary": "standard",
+    "script": "d /e[f=\"mami\", hn=1]!s[g=\"pig\"] c",
+    "expect": { "status": "error", "code": "SINGLETON_CANNOT_BE_CREATED_OR_DELETED", "kind": "static", "commandIndex": 1 } }
+]
