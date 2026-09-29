@@ -6036,7 +6036,21 @@ implementation MAY add cases; it MUST pass these.
     "description": "a reversal belongs to a sense and not to an entry",
     "dictionary": "standard",
     "script": "create reversal(type = \"reversal\", form@tww = \"mami\") under entry[form@tww = \"memi\"]",
-    "expect": { "status": "error", "code": "ILLEGAL_PARENT", "kind": "static", "commandIndex": 1 } }
+    "expect": { "status": "error", "code": "ILLEGAL_PARENT", "kind": "static", "commandIndex": 1 } },
+
+  { "id": "C-086", "section": "5.3.4", "syntax": "LiftPatchRef",
+    "description": "writing the type of a typed component re-keys it in place, and its other properties come with it",
+    "dictionary": "standard",
+    "script": "set type = \"literal\"\n  on translation^free\n  of example[text@tww = \"a mami jefi\"]\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]\nupdate text@en = \"I shot it\"\n  on translation^literal\n  of example[text@tww = \"a mami jefi\"]\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "ok", "effects": [
+      { "kind": "propertyReplaced", "property": "type", "language": null, "oldValue": "free", "newValue": "literal" },
+      { "kind": "propertyReplaced", "property": "text", "language": "en", "oldValue": "I shot a pig", "newValue": "I shot it" } ] } },
+
+  { "id": "C-087", "section": "5.2", "syntax": "LiftPatchRef",
+    "description": "re-keying a typed component onto a type a sibling already has is a duplicate",
+    "dictionary": "standard",
+    "script": "create translation(type = \"literal\", text@en = \"precisely\")\n  under example[text@tww = \"a mami jefi\"]\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]\nset type = \"literal\"\n  on translation^free\n  of example[text@tww = \"a mami jefi\"]\n  of sense[gloss@en = \"pig\"]\n  of entry[form@tww = \"mami\", hn = 1]",
+    "expect": { "status": "error", "code": "CANNOT_CREATE_DUPLICATE", "kind": "dynamic", "commandIndex": 2 } }
 ]
 ```
 

@@ -2,36 +2,31 @@ package fr.cnrs.lacito.liftpatchbox.model;
 
 import fr.cnrs.lacito.liftapi.LiftDictionary;
 import fr.cnrs.lacito.liftapi.model.AbstractLiftRoot;
-import fr.cnrs.lacito.liftapi.model.LiftExample;
 import fr.cnrs.lacito.liftapi.model.LiftSense;
 
 /**
  * A handle on one component of the dictionary, carrying the LiftPatch component
  * type together with whatever the {@code lift-api} model uses to represent it.
  *
- * <p>Three of the four shapes exist because the dictionary model does not
- * represent every LiftPatch component as an object of its own:</p>
+ * <p>Almost every component is an ordinary {@code lift-api} object and is wrapped
+ * by {@link Node}. Two shapes exist for the two that are not:</p>
  *
  * <ul>
- *   <li>a {@link Node} wraps an ordinary {@code lift-api} component;</li>
  *   <li>a {@link Category} wraps the <em>host sense</em> rather than the
  *       component, because the specification says a singleton always exists while
  *       the dictionary model leaves its grammatical information absent until a
  *       value is written. Resolving it lazily is what makes
  *       {@code set value = "Noun" on category of sense[...]} work on a sense that
  *       has no grammatical information yet;</li>
- *   <li>a {@link Translation} wraps the example and the type key, because the
- *       dictionary model holds translations as a map from a type to a multitext
- *       rather than as components;</li>
  *   <li>a {@link Root} stands for the dictionary itself, the one legal parent of
  *       an {@code entry}.</li>
  * </ul>
  *
- * <p>All four are records, so two handles on the same component compare equal,
+ * <p>All three are records, so two handles on the same component compare equal,
  * which is what the resolver relies on when it deduplicates candidate paths.</p>
  */
 public sealed interface ComponentRef
-    permits ComponentRef.Root, ComponentRef.Node, ComponentRef.Category, ComponentRef.Translation {
+    permits ComponentRef.Root, ComponentRef.Node, ComponentRef.Category {
 
     /**
      * The LiftPatch component type this handle denotes.
@@ -88,25 +83,6 @@ public sealed interface ComponentRef
         @Override
         public String toString() {
             return "category";
-        }
-    }
-
-    /**
-     * One translation of an example, identified by its example and its type key.
-     *
-     * @param example the example the translation belongs to
-     * @param type    the value of its {@code type} property, which is its key
-     */
-    record Translation(LiftExample example, String type) implements ComponentRef {
-
-        @Override
-        public String componentType() {
-            return "translation";
-        }
-
-        @Override
-        public String toString() {
-            return "translation^" + type;
         }
     }
 }

@@ -23,6 +23,7 @@ import fr.cnrs.lacito.liftpatchbox.error.LiftPatchException;
 import fr.cnrs.lacito.liftpatchbox.error.LiftPatchWarning;
 import fr.cnrs.lacito.liftpatchbox.error.SourcePosition;
 import fr.cnrs.lacito.liftpatchbox.error.WarningCode;
+import fr.cnrs.lacito.liftapi.model.DuplicateTypeException;
 import fr.cnrs.lacito.liftpatchbox.metamodel.ComponentTypeDef;
 import fr.cnrs.lacito.liftpatchbox.metamodel.LanguageKind;
 import fr.cnrs.lacito.liftpatchbox.metamodel.Metamodel;
@@ -294,8 +295,9 @@ public final class Executor {
         collectInitializers(constructor, def, scalars, multitexts, written);
 
         Integer position = creationPosition(at, parent, def);
-        ComponentRef created =
-            model.createChild(parent, new LiftModel.NewComponent(type, scalars, multitexts), position);
+        LiftModel.NewComponent spec = new LiftModel.NewComponent(type, scalars, multitexts);
+        ComponentRef created = duplicateAware(
+            () -> model.createChild(parent, spec, position), def, constructor.position());
         checkUniquenessInvariant(parent, created, def, constructor.position());
 
         effects.add(Effect.created(type, model.positionOf(created).orElse(null)));
@@ -717,7 +719,12 @@ public final class Executor {
             String old = model.scalar(component, property.name()).orElse(null);
             String value = resolver.scalarValueOf(
                 assignment.value(), property, assignment.position());
-            model.setScalar(component, property.name(), value);
+            duplicateAware(
+                () -> {
+                    model.setScalar(component, property.name(), value);
+                    return null;
+                },
+                def, assignment.position());
             effects.add(Effect.written(property.name(), null, old, value));
             return effects;
         }
@@ -1011,6 +1018,30 @@ public final class Executor {
     // ===================================================================
     // The uniqueness invariant
     // ===================================================================
+
+    /**
+     * Run a mutation that the dictionary model may refuse as a duplicate key, and
+     * report the refusal with the language's own code.
+     *
+     * <p>A parent that holds its children keyed by type — the map of a {@code note}
+     * or of a {@code translation} — refuses a second child of the same type itself,
+     * as it adds it or re-keys it. That is the uniqueness invariant of Part 1,
+     * section 5.2 enforced one level down, and it fires before
+     * {@link #checkUniquenessInvariant} can look, so it is caught here and turned
+     * into {@code CANNOT_CREATE_DUPLICATE}.</p>
+     */
+    private <T> T duplicateAware(
+        java.util.function.Supplier<T> mutation, ComponentTypeDef def, SourcePosition position
+    ) {
+        try {
+            return mutation.get();
+        } catch (DuplicateTypeException e) {
+            throw resolver.error(ErrorCode.CANNOT_CREATE_DUPLICATE,
+                "two `" + def.name() + "` siblings would share the same `type`, which is the "
+                    + "key their parent holds them by",
+                position);
+        }
+    }
 
     /**
      * Check the uniqueness invariant of Part 1, section 5.2: under a given parent,

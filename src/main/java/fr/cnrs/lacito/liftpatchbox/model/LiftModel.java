@@ -7,6 +7,7 @@ import fr.cnrs.lacito.liftapi.model.AbstractExtensibleWithoutField;
 import fr.cnrs.lacito.liftapi.model.AbstractIdentifiable;
 import fr.cnrs.lacito.liftapi.model.AbstractLiftRoot;
 import fr.cnrs.lacito.liftapi.model.AbstractNotable;
+import fr.cnrs.lacito.liftapi.model.DuplicateTypeException;
 import fr.cnrs.lacito.liftapi.model.Feature;
 import fr.cnrs.lacito.liftapi.model.FeatureSet;
 import fr.cnrs.lacito.liftapi.model.Form;
@@ -25,6 +26,7 @@ import fr.cnrs.lacito.liftapi.model.LiftPronunciation;
 import fr.cnrs.lacito.liftapi.model.LiftRelation;
 import fr.cnrs.lacito.liftapi.model.LiftReversal;
 import fr.cnrs.lacito.liftapi.model.LiftSense;
+import fr.cnrs.lacito.liftapi.model.LiftTranslation;
 import fr.cnrs.lacito.liftapi.model.LiftTrait;
 import fr.cnrs.lacito.liftapi.model.LiftVariant;
 import fr.cnrs.lacito.liftapi.model.MultiText;
@@ -64,7 +66,9 @@ import javafx.collections.ObservableList;
  *       and that definition is both the key the trait is stored under and what
  *       gives its value a datatype. The language therefore refuses to rewrite it
  *       with {@code PROPERTY_IS_READ_ONLY}, statically, rather than letting a
- *       command reach a component that cannot carry it out;</li>
+ *       command reach a component that cannot carry it out. A {@code note} and a
+ *       {@code translation} are keyed by their type too, but theirs is writable:
+ *       their parent re-keys them in place when {@code setType} is called;</li>
  *   <li>a {@code reversal} holds only sub-reversals, and its natural identity is
  *       {@code type + form} rather than {@code type + target}: the dictionary
  *       model gives a reversal forms, a type and nested reversals, and no
@@ -245,7 +249,6 @@ public final class LiftModel {
         return switch (ref) {
             case ComponentRef.Root _ -> null;
             case ComponentRef.Category c -> new ComponentRef.Node("sense", c.host());
-            case ComponentRef.Translation t -> new ComponentRef.Node("example", t.example());
             case ComponentRef.Node node -> {
                 if (node.node() instanceof LiftEntry) {
                     yield root();
@@ -280,6 +283,7 @@ public final class LiftModel {
             case LiftAnnotation _ -> "annotation";
             case LiftNote _ -> "note";
             case LiftField _ -> "field";
+            case LiftTranslation _ -> "translation";
             case GrammaticalInfo _ -> "category";
             default -> throw new UnsupportedByModelException(
                 "the dictionary model class " + node.getClass().getSimpleName()
@@ -321,11 +325,6 @@ public final class LiftModel {
             }
             return List.of();
         }
-        if (parent instanceof ComponentRef.Translation) {
-            // A translation has no child in the metamodel.
-            return List.of();
-        }
-
         AbstractLiftRoot node = ((ComponentRef.Node) parent).node();
         return switch (childType) {
             case "sense" -> node instanceof LiftEntry e ? wrap("sense", e.getSenses())
@@ -360,12 +359,14 @@ public final class LiftModel {
                 ? wrap("annotation", e.getAnnotations())
                 : node instanceof LiftTrait t ? wrap("annotation", t.getAnnotations())
                 : unsupportedChild(parent, childType);
-            case "note" -> node instanceof AbstractNotable n ? sortedByKey("note", n.getNotes())
+            case "note" -> node instanceof AbstractNotable n
+                ? sortedByFeature("note", n.getNotes())
                 : unsupportedChild(parent, childType);
             case "field" -> node instanceof AbstractExtensibleWithField f
                 ? sortedByKey("field", f.getFields())
                 : unsupportedChild(parent, childType);
-            case "translation" -> node instanceof LiftExample x ? translations(x)
+            case "translation" -> node instanceof LiftExample x
+                ? wrap("translation", List.copyOf(x.getTranslationComponents()))
                 : unsupportedChild(parent, childType);
             case "category" -> node instanceof LiftSense s
                 ? List.of(new ComponentRef.Category(s))
@@ -382,6 +383,11 @@ public final class LiftModel {
         return out;
     }
 
+    /**
+     * The children of a typed component type whose parent keys them by a string:
+     * the {@code field} map. They are returned in key order, which is stable and
+     * carries no meaning — a typed component has no position.
+     */
     private static List<ComponentRef> sortedByKey(
         String type, Map<String, ? extends AbstractLiftRoot> map
     ) {
@@ -392,11 +398,17 @@ public final class LiftModel {
         return out;
     }
 
-    private static List<ComponentRef> translations(LiftExample example) {
-        List<ComponentRef> out = new ArrayList<>();
-        example.getTranslations().keySet().stream()
-            .sorted(Comparator.comparing(Feature::getId))
-            .forEach(f -> out.add(new ComponentRef.Translation(example, f.getId())));
+    /**
+     * The same, for a parent that keys its children by the {@link Feature} their
+     * type is: the {@code note} map.
+     */
+    private static List<ComponentRef> sortedByFeature(
+        String type, Map<Feature, ? extends AbstractLiftRoot> map
+    ) {
+        List<ComponentRef> out = new ArrayList<>(map.size());
+        map.entrySet().stream()
+            .sorted(Comparator.comparing(e -> e.getKey().getId()))
+            .forEach(e -> out.add(new ComponentRef.Node(type, e.getValue())));
         return out;
     }
 
@@ -428,9 +440,6 @@ public final class LiftModel {
                 ? grammaticalInfo(category.host())
                     .map(GrammaticalInfo::getGramInfoValue)
                     .map(Feature::getId)
-                : Optional.empty();
-            case ComponentRef.Translation translation -> "type".equals(property)
-                ? Optional.of(translation.type())
                 : Optional.empty();
             case ComponentRef.Node node -> scalarOfNode(node, property);
             case ComponentRef.Root _ -> Optional.empty();
@@ -474,6 +483,8 @@ public final class LiftModel {
                 default -> Optional.empty();
             };
             case LiftNote n -> "type".equals(property) ? featureId(n.getType()) : Optional.empty();
+            case LiftTranslation t -> "type".equals(property)
+                ? featureId(t.getType()) : Optional.empty();
             case LiftField f -> "type".equals(property)
                 ? Optional.ofNullable(f.getSpecification()).map(LiftFieldAndTraitDefinition::getName)
                 : Optional.empty();
@@ -513,15 +524,6 @@ public final class LiftModel {
      * @throws UnsupportedByModelException if the dictionary model has no field for it
      */
     public Optional<MultiText> multitext(ComponentRef ref, String property) {
-        if (ref instanceof ComponentRef.Translation translation) {
-            if (!"text".equals(property)) {
-                return Optional.empty();
-            }
-            Feature key = translationType(translation.example(), translation.type());
-            return key == null
-                ? Optional.empty()
-                : Optional.ofNullable(translation.example().getTranslations().get(key));
-        }
         if (ref instanceof ComponentRef.Category) {
             return Optional.empty();
         }
@@ -558,6 +560,8 @@ public final class LiftModel {
                 ? Optional.of(note.getText()) : Optional.empty();
             case LiftField f -> "text".equals(property)
                 ? Optional.of(f.getText()) : Optional.empty();
+            case LiftTranslation t -> "text".equals(property)
+                ? Optional.of(t.getTranslation()) : Optional.empty();
             default -> Optional.empty();
         };
     }
@@ -607,13 +611,6 @@ public final class LiftModel {
                 throw unsupportedProperty("category", property);
             }
             setCategoryValue(category.host(), value);
-            return;
-        }
-        if (ref instanceof ComponentRef.Translation translation) {
-            if (!"type".equals(property)) {
-                throw unsupportedProperty("translation", property);
-            }
-            retypeTranslation(translation, value);
             return;
         }
         AbstractLiftRoot node = ((ComponentRef.Node) ref).node();
@@ -701,7 +698,15 @@ public final class LiftModel {
                 if (!"type".equals(property)) {
                     throw unsupportedProperty("note", property);
                 }
-                retypeNote(n, value);
+                setFeature(n.getType(), value,
+                    dictionary.getHeader().getNoteTypeManager(), n::setType);
+            }
+            case LiftTranslation t -> {
+                if (!"type".equals(property)) {
+                    throw unsupportedProperty("translation", property);
+                }
+                setFeature(t.getType(), value,
+                    dictionary.getHeader().getTranslationTypeManager(), t::setType);
             }
             case LiftField f -> {
                 if (!"type".equals(property)) {
@@ -806,6 +811,18 @@ public final class LiftModel {
         });
     }
 
+    /**
+     * Write the {@code type} of a component, and record the inverse.
+     *
+     * <p>On a component whose parent holds its children keyed by type — a
+     * {@code note}, a {@code translation} — {@code setType} delegates to that
+     * parent's {@code retypeX}, which re-keys the child in place: the component
+     * keeps its identity, its text and its registration, and the inverse is simply
+     * writing the old type back. A duplicate key is refused by the dictionary model
+     * with a {@link DuplicateTypeException}, which
+     * {@link #setScalar(ComponentRef, String, String)}'s caller turns into the
+     * language's own {@code CANNOT_CREATE_DUPLICATE}.</p>
+     */
     private void setFeature(
         Feature old, String value, FeatureSet manager, java.util.function.Consumer<Feature> setter
     ) {
@@ -842,26 +859,6 @@ public final class LiftModel {
         }
     }
 
-    private void retypeNote(LiftNote note, String value) {
-        AbstractNotable parent = note.getParent();
-        Feature old = note.getType();
-        if (parent == null) {
-            note.setType(dictionary.getHeader().getNoteTypeManager().getOrCreateFeature(value));
-            journal.record(() -> note.setType(old));
-            return;
-        }
-        // The note lives in a map keyed by its type, so re-keying it is a removal
-        // and an insertion rather than a field assignment.
-        parent.deleteNote(note);
-        note.setType(dictionary.getHeader().getNoteTypeManager().getOrCreateFeature(value));
-        parent.addNote(note);
-        journal.record(() -> {
-            parent.deleteNote(note);
-            note.setType(old);
-            parent.addNote(note);
-        });
-    }
-
     private void retypeField(LiftField field, String value) {
         AbstractExtensibleWithField parent = field.getParent();
         LiftFieldAndTraitDefinition old = field.getSpecification();
@@ -880,32 +877,6 @@ public final class LiftModel {
             field.specificationProperty().set(old);
             parent.addField(field);
         });
-    }
-
-    private void retypeTranslation(ComponentRef.Translation ref, String value) {
-        LiftExample example = ref.example();
-        Feature old = translationType(example, ref.type());
-        if (old == null) {
-            return;
-        }
-        MultiText text = example.getTranslations().get(old);
-        Feature fresh =
-            dictionary.getHeader().getTranslationTypeManager().getOrCreateFeature(value);
-        example.getTranslations().remove(old);
-        example.getTranslations().put(fresh, text);
-        journal.record(() -> {
-            example.getTranslations().remove(fresh);
-            example.getTranslations().put(old, text);
-        });
-    }
-
-    private static Feature translationType(LiftExample example, String type) {
-        for (Feature f : example.getTranslations().keySet()) {
-            if (f.getId().equals(type)) {
-                return f;
-            }
-        }
-        return null;
     }
 
     // ===================================================================
@@ -1182,11 +1153,12 @@ public final class LiftModel {
 
     private ComponentRef createTranslation(ComponentRef parent, NewComponent spec) {
         LiftExample example = requireType(parent, LiftExample.class, "translation");
-        String type = required(spec, "type", "translation");
-        Feature key = dictionary.getHeader().getTranslationTypeManager().getOrCreateFeature(type);
-        example.getOrCreateTranslation(key);
-        journal.record(() -> example.getTranslations().remove(key));
-        return new ComponentRef.Translation(example, type);
+        Feature key = dictionary.getHeader().getTranslationTypeManager()
+            .getOrCreateFeature(required(spec, "type", "translation"));
+        LiftTranslation translation = LiftTranslation.create(key);
+        example.addTranslation(translation);
+        journal.record(() -> example.deleteTranslation(translation));
+        return new ComponentRef.Node("translation", translation);
     }
 
     private void setCreatedReference(
@@ -1230,17 +1202,6 @@ public final class LiftModel {
      * @throws UnsupportedByModelException if the dictionary model cannot remove it
      */
     public void delete(ComponentRef ref) {
-        if (ref instanceof ComponentRef.Translation translation) {
-            LiftExample example = translation.example();
-            Feature key = translationType(example, translation.type());
-            if (key == null) {
-                return;
-            }
-            MultiText text = example.getTranslations().get(key);
-            example.getTranslations().remove(key);
-            journal.record(() -> example.getTranslations().put(key, text));
-            return;
-        }
         if (!(ref instanceof ComponentRef.Node node)) {
             throw new UnsupportedByModelException(
                 "a `" + ref.componentType() + "` is never removed by a command");
@@ -1325,6 +1286,7 @@ public final class LiftModel {
             case LiftField f -> f.getParent().deleteField(f);
             case LiftTrait t -> t.getParent().deleteTrait(t);
             case LiftAnnotation a -> a.getParent().deleteAnnotation(a);
+            case LiftTranslation t -> t.getParent().deleteTranslation(t);
             default -> throw new UnsupportedByModelException(
                 "the dictionary model cannot remove a " + child.getClass().getSimpleName());
         }
@@ -1373,6 +1335,7 @@ public final class LiftModel {
             case LiftTrait t -> ((fr.cnrs.lacito.liftapi.model.HasTrait) parent).addTrait(t);
             case LiftAnnotation a ->
                 ((fr.cnrs.lacito.liftapi.model.HasAnnotation) parent).addAnnotation(a);
+            case LiftTranslation t -> ((LiftExample) parent).addTranslation(t);
             default -> throw new UnsupportedByModelException(
                 "the dictionary model cannot restore a " + child.getClass().getSimpleName());
         }

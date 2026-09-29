@@ -134,6 +134,36 @@ class ComponentCommandsTest extends PatchTestSupport {
         }
 
         @Test
+        @DisplayName("creates a translation, which the example keys by its type")
+        void createsATranslation() {
+            assertEffects(
+                applyConcise("c /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefo\"] "
+                    + "o(\"free\", \"I shot it\")"),
+                "created:translation@null", "set:type=free", "set:text@en=I shot it");
+        }
+
+        @Test
+        @DisplayName("refuses a second translation of the same type on one example")
+        void refusesADuplicateTranslation() {
+            // The example already carries a `free` translation, and the dictionary
+            // model refuses the duplicate key as it adds it; the language reports
+            // that with its own code.
+            refusedConcise(ErrorCode.CANNOT_CREATE_DUPLICATE,
+                "c /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefi\"] "
+                    + "o(\"free\", \"another one\")");
+        }
+
+        @Test
+        @DisplayName("refuses a second note of the same type on one component")
+        void refusesADuplicateNote() {
+            apply("create note(type = \"general\", text@en = \"first\") "
+                + "under entry[form@tww = \"memi\"]");
+            refused(ErrorCode.CANNOT_CREATE_DUPLICATE,
+                "create note(type = \"general\", text@en = \"second\") "
+                    + "under entry[form@tww = \"memi\"]");
+        }
+
+        @Test
         @DisplayName("refuses a missing required property")
         void refusesAMissingRequiredProperty() {
             refused(ErrorCode.MISSING_REQUIRED_PROPERTY,
@@ -285,6 +315,16 @@ class ComponentCommandsTest extends PatchTestSupport {
             assertEffects(plan);
             assertEquals(1, plan.warnings().size());
             assertEquals("COMMAND_APPLIES_TO_NO_COMPONENT", plan.warnings().get(0).code().name());
+        }
+
+        @Test
+        @DisplayName("removes a translation and leaves the example's others")
+        void removesATranslation() {
+            assertEffects(
+                applyConcise("d /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefi\"] o^free"),
+                "deleted:translation@null");
+            refusedConcise(ErrorCode.NOT_FOUND,
+                "e /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefi\"] o^free");
         }
 
         @Test

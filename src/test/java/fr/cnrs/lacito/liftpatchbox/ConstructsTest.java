@@ -324,6 +324,25 @@ class ConstructsTest extends PatchTestSupport {
         }
 
         @Test
+        @DisplayName("rolls a created translation back, the path an apply never exercises")
+        void rollsATranslationBack() {
+            // Plan mode always rolls back, so a component the dictionary model holds
+            // in a map of its parent is undone through that parent rather than by
+            // editing the map. Nothing else in the suite reaches this path.
+            Plan plan = box.plan(dictionary,
+                "c /mami/pig/\"a mami jefo\" o(\"free\", \"I shot it\")",
+                fr.cnrs.lacito.liftpatchbox.ast.Syntax.CONCISE, "<test>");
+            assertTrue(plan.isOk(), () -> String.valueOf(plan.error()));
+            assertEffects(plan,
+                "created:translation@null", "set:type=free", "set:text@en=I shot it");
+            // The example is left as it was: its second example still has none.
+            assertEffects(box.plan(dictionary,
+                "c /mami/pig/\"a mami jefo\" o(\"free\", \"I shot it\")",
+                fr.cnrs.lacito.liftpatchbox.ast.Syntax.CONCISE, "<test>"),
+                "created:translation@null", "set:type=free", "set:text@en=I shot it");
+        }
+
+        @Test
         @DisplayName("emits a plan document whose summary counts what the script would do")
         void emitsAPlanDocument() {
             Plan plan = plan("create sense(gloss@en = \"puppy\") under entry[form@tww = \"memi\"]");

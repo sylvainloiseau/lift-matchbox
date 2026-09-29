@@ -303,6 +303,91 @@ class PropertyCommandsTest extends PatchTestSupport {
     }
 
     @Nested
+    @DisplayName("re-keying a typed component")
+    class Rekeying {
+
+        @Test
+        @DisplayName("writing the type of a translation re-keys it and keeps its text")
+        void reKeysATranslation() {
+            assertEffects(
+                applyConcise("s /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefi\"] "
+                    + "o^free (y = \"literal\")"),
+                "replaced:type:free->literal");
+            // The component is re-keyed in place, so its text comes with it.
+            assertEffects(
+                applyConcise("u /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefi\"] "
+                    + "o^literal (t@en = \"I shot it\")"),
+                "replaced:text@en:I shot a pig->I shot it");
+        }
+
+        @Test
+        @DisplayName("writing the type of a note re-keys it and keeps its text")
+        void reKeysANote() {
+            apply("create note(type = \"general\", text@en = \"checked\") "
+                + "under entry[form@tww = \"memi\"]");
+            assertEffects(
+                apply("set type = \"editorial\" on note^general of entry[form@tww = \"memi\"]"),
+                "replaced:type:general->editorial");
+            assertEffects(
+                apply("update text@en = \"re-checked\" "
+                    + "on note^editorial of entry[form@tww = \"memi\"]"),
+                "replaced:text@en:checked->re-checked");
+        }
+
+        @Test
+        @DisplayName("walks several notes in a stable order, whatever order they were created in")
+        void walksNotesInAStableOrder() {
+            // The dictionary model holds notes in a map keyed by the Feature their
+            // type is, so nothing of the insertion order survives; the adapter orders
+            // them by type id, which is what makes a marked command's effect list
+            // reproducible.
+            apply("create note(type = \"review\", text@en = \"r\") "
+                + "under entry[form@tww = \"memi\"]");
+            apply("create note(type = \"general\", text@en = \"g\") "
+                + "under entry[form@tww = \"memi\"]");
+            apply("create note(type = \"editorial\", text@en = \"e\") "
+                + "under entry[form@tww = \"memi\"]");
+            assertEffects(
+                applyConcise("s* /e[f=\"memi\"]/n[exists(t@en)] (t@en = \"seen\")"),
+                "replaced:text@en:e->seen",
+                "replaced:text@en:g->seen",
+                "replaced:text@en:r->seen");
+        }
+
+        @Test
+        @DisplayName("reaches each note by its type key")
+        void reachesEachNoteByItsTypeKey() {
+            apply("create note(type = \"review\", text@en = \"r\") "
+                + "under entry[form@tww = \"memi\"]");
+            apply("create note(type = \"general\", text@en = \"g\") "
+                + "under entry[form@tww = \"memi\"]");
+            assertEffects(apply("ensure note^review under entry[form@tww = \"memi\"]"));
+            assertEffects(apply("ensure note^general under entry[form@tww = \"memi\"]"));
+        }
+
+        @Test
+        @DisplayName("refuses to re-key a translation onto a type the example already has")
+        void refusesADuplicateTranslationKey() {
+            applyConcise("c /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefi\"] "
+                + "o(\"literal\", \"I shot a pig, precisely\")");
+            refusedConcise(ErrorCode.CANNOT_CREATE_DUPLICATE,
+                "s /e[f=\"mami\", hn=1]!s[g=\"pig\"]!x[t=\"a mami jefi\"] "
+                    + "o^free (y = \"literal\")");
+        }
+
+        @Test
+        @DisplayName("refuses to re-key a note onto a type the component already has")
+        void refusesADuplicateNoteKey() {
+            apply("create note(type = \"general\", text@en = \"one\") "
+                + "under entry[form@tww = \"memi\"]");
+            apply("create note(type = \"editorial\", text@en = \"two\") "
+                + "under entry[form@tww = \"memi\"]");
+            refused(ErrorCode.CANNOT_CREATE_DUPLICATE,
+                "set type = \"editorial\" on note^general of entry[form@tww = \"memi\"]");
+        }
+    }
+
+    @Nested
     @DisplayName("read-only properties")
     class ReadOnly {
 
